@@ -1,4 +1,4 @@
-package com.ufomap.ufosightingmap // Corrected package name
+package com.ufomap.ufosightingmap
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -13,10 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import androidx.preference.PreferenceManager // Correct import
-import com.ufomap.ufosightingmap.ui.MapScreen // Correct import
-import com.ufomap.ufosightingmap.ui.theme.UFOSightingsTheme // Correct import
-import com.ufomap.ufosightingmap.viewmodel.MapViewModel // Correct import
+import androidx.preference.PreferenceManager
+import com.ufomap.ufosightingmap.ui.MapScreen
+import com.ufomap.ufosightingmap.ui.theme.UfoSightingMapTheme
+import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import org.osmdroid.config.Configuration
 
 class MainActivity : ComponentActivity() {
@@ -38,29 +38,29 @@ class MainActivity : ComponentActivity() {
         // osmdroid Configuration
         Configuration.getInstance().load(
             applicationContext,
-            PreferenceManager.getDefaultSharedPreferences(applicationContext) // Use imported PreferenceManager
+            PreferenceManager.getDefaultSharedPreferences(applicationContext)
         )
-        // Setting a user agent using BuildConfig (ensure BuildConfig is generated)
-        Configuration.getInstance().userAgentValue = BuildConfig.APPLICATION_ID
+
+        // Setting a user agent - using packageName instead of BuildConfig.APPLICATION_ID
+        Configuration.getInstance().userAgentValue = applicationContext.packageName
         Log.i("MainActivity", "osmdroid configuration loaded. User Agent: ${Configuration.getInstance().userAgentValue}")
 
-        requestLocationPermission() // Request location permission
+        requestLocationPermission()
 
         // Set the Compose content for the activity
-        setContent { // Calls to Composables must be within setContent or another @Composable function
-            UFOSightingsTheme { // Use imported Theme
+        setContent {
+            UfoSightingMapTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MapScreen(mapViewModel) // Use imported MapScreen
+                    MapScreen(mapViewModel)
                 }
             }
         }
     }
 
     private fun requestLocationPermission() {
-        // Permission request logic remains the same
         when {
             ContextCompat.checkSelfPermission(
                 this,

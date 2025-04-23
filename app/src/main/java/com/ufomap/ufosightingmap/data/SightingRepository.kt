@@ -1,45 +1,72 @@
-package com.ufomap.ufosightingmap.data // Corrected package name
+package com.ufomap.ufosightingmap.data
 
 import android.content.Context
 import android.util.Log
-import com.ufomap.ufosightingmap.utils.loadSightingsFromJson // Correct import
+import com.ufomap.ufosightingmap.utils.loadSightingsFromJson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
+/**
+ * Repository for UFO Sighting data.
+ * Manages interactions between the data sources (local database, JSON assets) and the rest of the app.
+ */
 class SightingRepository(private val sightingDao: SightingDao, private val context: Context) {
 
+    // Expose all sightings as a Flow for reactive UI updates
     val allSightings: Flow<List<Sighting>> = sightingDao.getAllSightings()
 
-    suspend fun refreshSightings() {
-        // TODO: Implement network fetching logic if needed
-    }
-
+    /**
+     * Get sightings within a geographical boundary
+     */
     fun getSightingsInBounds(north: Double, south: Double, east: Double, west: Double): Flow<List<Sighting>> {
         return sightingDao.getSightingsInBounds(north, south, east, west)
     }
 
+    /**
+     * Initialize the database with sightings from the JSON asset file if the database is empty.
+     */
     fun initializeDatabaseIfNeeded(scope: CoroutineScope) {
         scope.launch(Dispatchers.IO) {
-            if (sightingDao.count() == 0) {
-                Log.d("SightingRepository", "Database is empty. Loading from JSON asset.")
-                try {
-                    // Call the correctly imported function
-                    val sightingsList: List<Sighting>? = loadSightingsFromJson(context, "sightings.json")
-                    // Check if the list is not null before using it
-                    if (sightingsList != null) {
-                        sightingDao.insertAll(sightingsList) // Pass the correctly typed list
-                        Log.d("SightingRepository", "Successfully loaded ${sightingsList.size} sightings from JSON.") // Use size on the list
-                    } else {
-                        Log.e("SightingRepository", "Failed to load sightings from JSON (returned null).")
-                    }
-                } catch (e: Exception) {
-                    Log.e("SightingRepository", "Error loading sightings from JSON", e)
+            try {
+                val count = sightingDao.count()
+                if (count == 0) {
+                    Log.d("SightingRepository", "Database is empty. Loading from JSON asset.")
+                    loadSightingsFromJsonAndInsert()
+                } else {
+                    Log.d("SightingRepository", "Database already contains $count sightings.")
                 }
-            } else {
-                Log.d("SightingRepository", "Database already populated.")
+            } catch (e: Exception) {
+                Log.e("SightingRepository", "Error checking database state", e)
             }
         }
+    }
+
+    /**
+     * Load sightings from the JSON asset file and insert them into the database.
+     * Called during initialization if the database is empty.
+     */
+    private suspend fun loadSightingsFromJsonAndInsert() {
+        try {
+            val sightingsList = loadSightingsFromJson(context, "sightings.json")
+            if (sightingsList != null && sightingsList.isNotEmpty()) {
+                Log.d("SightingRepository", "Loaded ${sightingsList.size} sightings, inserting into database")
+                sightingDao.insertAll(sightingsList)
+                Log.d("SightingRepository", "Successfully loaded sightings from JSON.")
+            } else {
+                Log.e("SightingRepository", "Failed to load sightings - data was null or empty")
+            }
+        } catch (e: Exception) {
+            Log.e("SightingRepository", "Error loading sightings from JSON: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Refresh sightings from a network source
+     * TODO: Implement when adding network functionality
+     */
+    suspend fun refreshSightings() {
+        // Future implementation for network data fetching
     }
 }

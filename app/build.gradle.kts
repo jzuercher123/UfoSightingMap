@@ -1,36 +1,30 @@
-// Correct imports for Java classes used below
 import java.util.Properties
 import java.io.FileInputStream
-// DO NOT include 'import kotlin.io.util.*' - it's incorrect
 
-// Top-level plugins block
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt") // Required for Room annotation processing. Consider migrating to KSP.
-    id("org.jetbrains.kotlin.plugin.compose") // Compose Compiler Plugin
-    // Uncomment if using Hilt for Dependency Injection
-    // id("com.google.dagger.hilt.android")
+    id("kotlin-kapt")
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
-    // Specifies the namespace for the application, used for resource generation (R class).
-    namespace = "com.ufomap.ufosightingmap" // Corrected namespace
-    compileSdk = 34 // Target SDK version for compilation. Use the latest stable version.
+    namespace = "com.ufomap.ufosightingmap"
+    compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.ufomap.ufosightingmap" // Corrected application ID
-        minSdk = 24 // Minimum Android version required to run the app.
-        targetSdk = 34 // Target Android version the app is tested against.
-        versionCode = 1 // Internal version number. Increment for each release.
-        versionName = "1.0" // User-visible version string.
+        applicationId = "com.ufomap.ufosightingmap"
+        minSdk = 24
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" // Test runner class.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
-            useSupportLibrary = true // Enable support for vector drawables on older API levels.
+            useSupportLibrary = true
         }
 
-        // Read API key from local.properties (Not needed for osmdroid, but harmless)
+        // Read API key from local.properties
         val localProperties = Properties()
         try {
             localProperties.load(FileInputStream(rootProject.file("local.properties")))
@@ -38,7 +32,6 @@ android {
             println("Warning: local.properties file not found. MAPS_API_KEY might be missing.")
         }
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
-
     }
 
     buildTypes {
@@ -62,7 +55,7 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3" // Check compatibility
+        kotlinCompilerExtensionVersion = "1.5.3"
     }
     packaging {
         resources {
@@ -74,57 +67,54 @@ android {
 }
 
 dependencies {
-
     // Core Android libraries
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.activity:activity-compose:1.8.2")
 
-    // --- Add Material Components library for XML themes ---
-    implementation("com.google.android.material:material:1.11.0") // Check for the latest stable version
+    // Material Components library for XML themes
+    implementation("com.google.android.material:material:1.11.0")
 
     // Jetpack Compose BOM
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3") // Material 3 for Compose UI
+    implementation("androidx.compose.material3:material3")
 
-    // --- osmdroid Dependencies ---
+    // osmdroid Dependencies
     implementation("org.osmdroid:osmdroid-android:6.1.18")
-    implementation(libs.androidx.preference.ktx) // Core osmdroid library
+    implementation("androidx.preference:preference-ktx:1.2.1") // For osmdroid configuration
 
-    // Room Database (Keep as is)
+    // Room Database
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     kapt("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
 
-    // Coroutines (Keep as is)
+    // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 
-    // Lifecycle ViewModel (Keep as is)
+    // Lifecycle ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
-    // Gson (Keep as is)
+    // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // Hilt (Optional)
-    // implementation("com.google.dagger:hilt-android:2.48.1")
-    // kapt("com.google.dagger:hilt-compiler:2.48.1")
-    // implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    // Material icon support
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
-    // Testing dependencies (Keep as is)
+    // Testing dependencies
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 
-    // Debug dependencies (Keep as is)
+    // Debug dependencies
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
