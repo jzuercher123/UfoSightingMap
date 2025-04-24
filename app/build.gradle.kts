@@ -107,6 +107,9 @@ dependencies {
     // Material icon support
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
+    // Add to dependencies
+    implementation("androidx.navigation:navigation-compose:2.7.6")
+
     // Testing dependencies
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

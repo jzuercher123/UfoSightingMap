@@ -26,4 +26,10 @@ interface SightingDao {
     // Query to check if the database has any data.
     @Query("SELECT COUNT(*) FROM sightings")
     suspend fun count(): Int
+
+    // Add this method to SightingDao.kt
+
+    // Get a specific sighting by ID
+    @Query("SELECT * FROM sightings WHERE id = :id LIMIT 1")
+    fun getSightingById(id: Int): Flow<Sighting?>
 }

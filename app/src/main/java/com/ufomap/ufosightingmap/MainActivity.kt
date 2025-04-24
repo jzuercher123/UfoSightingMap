@@ -7,22 +7,27 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.navigation.compose.rememberNavController
 import androidx.preference.PreferenceManager
-import com.ufomap.ufosightingmap.ui.MapScreen
+import com.ufomap.ufosightingmap.ui.UFOSightingsNavGraph
 import com.ufomap.ufosightingmap.ui.theme.UfoSightingMapTheme
-import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import org.osmdroid.config.Configuration
 
+/**
+ * Main entry point for the UFO Sighting Map application.
+ * Responsible for:
+ * - Setting up OSMDroid configuration
+ * - Requesting location permissions
+ * - Initializing the Compose UI with navigation
+ */
 class MainActivity : ComponentActivity() {
 
-    private val mapViewModel: MapViewModel by viewModels()
-
+    // Permission request handler for location access
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
@@ -35,47 +40,77 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // osmdroid Configuration
-        Configuration.getInstance().load(
-            applicationContext,
-            PreferenceManager.getDefaultSharedPreferences(applicationContext)
-        )
+        // Configure OSMDroid
+        Configuration.getInstance().apply {
+            load(
+                applicationContext,
+                PreferenceManager.getDefaultSharedPreferences(applicationContext)
+            )
+            // Set user agent to app package name
+            userAgentValue = applicationContext.packageName
+        }
 
-        // Setting a user agent - using packageName instead of BuildConfig.APPLICATION_ID
-        Configuration.getInstance().userAgentValue = applicationContext.packageName
-        Log.i("MainActivity", "osmdroid configuration loaded. User Agent: ${Configuration.getInstance().userAgentValue}")
+        Log.i("MainActivity", "OSMDroid configuration loaded. User Agent: ${Configuration.getInstance().userAgentValue}")
 
+        // Request location permission for user location features
         requestLocationPermission()
 
-        // Set the Compose content for the activity
+        // Set up the Compose UI with navigation
         setContent {
             UfoSightingMapTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MapScreen(mapViewModel)
+                    // Create and remember navigation controller
+                    val navController = rememberNavController()
+
+                    // Set up navigation graph
+                    UFOSightingsNavGraph(navController)
                 }
             }
         }
     }
 
+    /**
+     * Request location permission if not already granted
+     */
     private fun requestLocationPermission() {
         when {
+            // Permission already granted
             ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED -> {
                 Log.i("Permission", "Location permission already granted")
             }
+
+            // Show rationale if needed
             shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
                 Log.w("Permission", "Showing rationale for location permission")
                 requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
+
+            // Request permission
             else -> {
                 Log.i("Permission", "Requesting location permission")
                 requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        Log.d("MainActivity", "onResume")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Log.d("MainActivity", "onPause")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d("MainActivity", "onDestroy")
     }
 }

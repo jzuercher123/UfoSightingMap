@@ -7,21 +7,20 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.FloatingActionButton
-import androidx.compose.material.Icon
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -46,7 +45,10 @@ const val INITIAL_ZOOM_LEVEL = 4.0
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MapScreen(viewModel: MapViewModel) {
+fun MapScreen(
+    viewModel: MapViewModel,
+    onSightingClick: (Int) -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -143,12 +145,20 @@ fun MapScreen(viewModel: MapViewModel) {
                                     // Store the sighting data object with the marker
                                     relatedObject = sighting
 
-                                    // Use the SightingInfoWindow
-                                    infoWindow = SightingInfoWindow(view)
+                                    // Use the SightingInfoWindow with navigation callback
+                                    infoWindow = SightingInfoWindow(view, onSightingClick)
 
                                     setOnMarkerClickListener { marker, mapView ->
                                         InfoWindow.closeAllInfoWindowsOn(mapView)
                                         marker.showInfoWindow()
+
+                                        // We could directly navigate here, but we're choosing to show
+                                        // the info window first and let the user click for details
+                                        /*
+                                        (marker.relatedObject as? Sighting)?.id?.let { sightingId ->
+                                            onSightingClick(sightingId)
+                                        }
+                                        */
                                         true
                                     }
                                 }
@@ -181,12 +191,13 @@ fun MapScreen(viewModel: MapViewModel) {
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp),
-                backgroundColor = MaterialTheme.colorScheme.primary
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
+                // Using a drawable resource for the location icon
                 Icon(
-                    Icons.Default.MyLocation,
-                    contentDescription = "My Location",
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
+                    contentDescription = "My Location"
                 )
             }
 
