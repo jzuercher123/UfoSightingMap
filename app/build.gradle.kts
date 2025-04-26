@@ -55,7 +55,8 @@ android {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.3"
+        // Updated to match Kotlin 2.0.21
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
     packaging {
         resources {
@@ -75,7 +76,7 @@ dependencies {
     // Material Components library for XML themes
     implementation("com.google.android.material:material:1.11.0")
 
-    // Jetpack Compose BOM
+    // Jetpack Compose BOM - updated to more recent version
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -97,6 +98,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.lifecycle:lifecycle-runtime-compose")
+
     // Make sure you have osmdroid dependencies
     implementation("org.osmdroid:osmdroid-android:6.1.18")
 
@@ -115,7 +117,7 @@ dependencies {
     // Material icon support
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
 
-    // Add to dependencies
+    // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
     // Testing dependencies

@@ -1,27 +1,67 @@
-/// Update the MapScreen.kt file with these changes
+package com.ufomap.ufosightingmap.ui
 
-// Import statements to add
+import android.annotation.SuppressLint
+import android.graphics.drawable.Drawable
+import android.util.Log
+import android.widget.Toast
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Badge
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.ufomap.ufosightingmap.R
-import com.ufomap.ufosightingmap.data.FilterState
+import com.ufomap.ufosightingmap.data.Sighting
+import com.ufomap.ufosightingmap.viewmodel.MapViewModel
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.infowindow.InfoWindow
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import androidx.compose.ui.viewinterop.AndroidView
 
-// In the MapScreen function, add these modifications:
+// Constants for map initialization
+private const val INITIAL_ZOOM_LEVEL = 4.5
+private val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795) // Center of USA
 
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     viewModel: MapViewModel,
-    onSightingClick: (Int) -> Unit
+    onSightingClick: (Int) -> Unit,
+    onReportSighting: () -> Unit // New parameter for navigation to submission screen
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -40,9 +80,15 @@ fun MapScreen(
             ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
     }
 
-    var locationOverlay: MyLocationNewOverlay? by remember { mutableStateOf(null) }
+    // Try to load a different icon for user submissions, fallback to default if not found
+    val userSubmittedMarkerIcon: Drawable? = remember {
+        ContextCompat.getDrawable(context, R.drawable.ic_marker_user_submitted)
+            ?: defaultMarkerIcon
+    }
 
-    // Lifecycle handling (keep existing code)
+    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+
+    // Lifecycle handling
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -113,12 +159,11 @@ fun MapScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Map view (keep existing implementation)
+            // Map view
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     MapView(ctx).apply {
-                        // Keep existing map setup code
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         setBuiltInZoomControls(true)
@@ -139,23 +184,29 @@ fun MapScreen(
                     }
                 },
                 update = { view ->
-                    // Keep existing marker update code
                     Log.d("MapScreen", "Updating MapView with ${sightings.size} sightings.")
 
                     val overlaysToRemove = view.overlays.filterIsInstance<Marker>()
                         .filter { it.id != null }
                     view.overlays.removeAll(overlaysToRemove)
 
-                    if (sightings.isNotEmpty() && defaultMarkerIcon != null) {
+                    if (sightings.isNotEmpty()) {
                         Log.d("MapScreen", "Creating ${sightings.size} markers")
                         try {
                             sightings.forEach { sighting ->
+                                // Select appropriate marker icon based on whether this is a user submission
+                                val markerIcon = if (sighting.isUserSubmitted) {
+                                    userSubmittedMarkerIcon ?: defaultMarkerIcon
+                                } else {
+                                    defaultMarkerIcon
+                                }
+
                                 val marker = Marker(view).apply {
                                     id = sighting.id.toString()
                                     position = GeoPoint(sighting.latitude, sighting.longitude)
                                     title = sighting.city ?: "Sighting ${sighting.id}"
                                     snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
-                                    icon = defaultMarkerIcon
+                                    icon = markerIcon
                                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
                                     relatedObject = sighting
@@ -177,7 +228,7 @@ fun MapScreen(
                 }
             )
 
-            // Location button (keep existing implementation)
+            // My Location button (bottom right)
             FloatingActionButton(
                 onClick = {
                     locationOverlay?.let { overlay ->
@@ -202,6 +253,21 @@ fun MapScreen(
                 Icon(
                     painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
                     contentDescription = "My Location"
+                )
+            }
+
+            // Report Sighting button (bottom left)
+            FloatingActionButton(
+                onClick = onReportSighting,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp),
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Report Sighting"
                 )
             }
 

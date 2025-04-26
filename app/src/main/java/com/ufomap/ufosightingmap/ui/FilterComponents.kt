@@ -1,19 +1,44 @@
 package com.ufomap.ufosightingmap.ui
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.ufomap.ufosightingmap.data.FilterState
-import androidx.compose.foundation.horizontalScroll
 
 /**
  * A bottom sheet for filtering UFO sightings
@@ -346,7 +371,7 @@ fun ActiveFilterChips(
             filterState.shape?.let {
                 FilterChip(
                     selected = true,
-                    onClick = { /* No action on click, just clear */ },
+                    onClick = { onClearFilter("shape") },
                     label = { Text("Shape: $it") },
                     trailingIcon = {
                         Icon(
@@ -354,8 +379,7 @@ fun ActiveFilterChips(
                             contentDescription = "Clear filter",
                             modifier = Modifier.size(16.dp)
                         )
-                    },
-                    onClick = { onClearFilter("shape") }
+                    }
                 )
             }
 
@@ -367,7 +391,8 @@ fun ActiveFilterChips(
                     trailingIcon = {
                         Icon(
                             Icons.Default.Clear,
-                            contentDescription = "Clear filter"
+                            contentDescription = "Clear filter",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 )
@@ -381,7 +406,8 @@ fun ActiveFilterChips(
                     trailingIcon = {
                         Icon(
                             Icons.Default.Clear,
-                            contentDescription = "Clear filter"
+                            contentDescription = "Clear filter",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 )
@@ -395,7 +421,8 @@ fun ActiveFilterChips(
                     trailingIcon = {
                         Icon(
                             Icons.Default.Clear,
-                            contentDescription = "Clear filter"
+                            contentDescription = "Clear filter",
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 )
@@ -412,7 +439,8 @@ fun ActiveFilterChips(
                 FilterChip(
                     selected = true,
                     onClick = { onClearAll() },
-                    label = { Text("Clear All") }
+                    label = { Text("Clear All") },
+                    trailingIcon = null
                 )
             }
         }

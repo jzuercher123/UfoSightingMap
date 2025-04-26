@@ -87,4 +87,13 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
             shape, city, country, state, startDate, endDate, searchText
         )
     }
+
+    suspend fun addUserSighting(sighting: Sighting): Long {
+        return sightingDao.insertSighting(sighting)
+    }
+
+    // Get user's submissions
+    fun getUserSubmissions(submittedBy: String): Flow<List<Sighting>> {
+        return sightingDao.getUserSubmissions(submittedBy)
+    }
 }

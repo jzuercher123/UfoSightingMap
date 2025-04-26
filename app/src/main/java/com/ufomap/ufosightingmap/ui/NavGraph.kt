@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import com.ufomap.ufosightingmap.viewmodel.SightingDetailViewModel
+import com.ufomap.ufosightingmap.viewmodel.SightingSubmissionViewModel
 
 /**
  * Defines the navigation routes in the app
@@ -25,6 +26,11 @@ sealed class Screen(val route: String) {
     object Detail : Screen("detail/{sightingId}") {
         fun createRoute(sightingId: Int) = "detail/$sightingId"
     }
+
+    /**
+     * Screen for submitting a new UFO sighting report
+     */
+    object SubmitSighting : Screen("submit")
 }
 
 /**
@@ -43,6 +49,9 @@ fun UFOSightingsNavGraph(navController: NavHostController) {
                 viewModel = viewModel,
                 onSightingClick = { sightingId ->
                     navController.navigate(Screen.Detail.createRoute(sightingId))
+                },
+                onReportSighting = {
+                    navController.navigate(Screen.SubmitSighting.route)
                 }
             )
         }
@@ -61,6 +70,18 @@ fun UFOSightingsNavGraph(navController: NavHostController) {
 
             SightingDetailScreen(
                 sightingId = sightingId,
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.navigateUp()
+                }
+            )
+        }
+
+        // Sighting Submission Screen
+        composable(Screen.SubmitSighting.route) {
+            val viewModel: SightingSubmissionViewModel = viewModel()
+
+            SightingSubmissionScreen(
                 viewModel = viewModel,
                 onNavigateBack = {
                     navController.navigateUp()
