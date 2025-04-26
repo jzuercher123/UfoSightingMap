@@ -32,4 +32,27 @@ interface SightingDao {
     // Get a specific sighting by ID
     @Query("SELECT * FROM sightings WHERE id = :id LIMIT 1")
     fun getSightingById(id: Int): Flow<Sighting?>
+
+    @Query("SELECT * FROM sightings WHERE " +
+            "(:shape IS NULL OR shape LIKE '%' || :shape || '%') AND " +
+            "(:city IS NULL OR city LIKE '%' || :city || '%') AND " +
+            "(:country IS NULL OR country LIKE '%' || :country || '%') AND " +
+            "(:state IS NULL OR state LIKE '%' || :state || '%') AND " +
+            "(:startDate IS NULL OR dateTime >= :startDate) AND " +
+            "(:endDate IS NULL OR dateTime <= :endDate) AND " +
+            "(:searchText IS NULL OR " +
+            "city LIKE '%' || :searchText || '%' OR " +
+            "state LIKE '%' || :searchText || '%' OR " +
+            "country LIKE '%' || :searchText || '%' OR " +
+            "summary LIKE '%' || :searchText || '%' OR " +
+            "shape LIKE '%' || :searchText || '%')")
+    fun getFilteredSightings(
+        shape: String? = null,
+        city: String? = null,
+        country: String? = null,
+        state: String? = null,
+        startDate: String? = null,
+        endDate: String? = null,
+        searchText: String? = null
+    ): Flow<List<Sighting>>
 }

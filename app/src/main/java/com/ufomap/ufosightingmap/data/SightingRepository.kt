@@ -69,4 +69,22 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     suspend fun refreshSightings() {
         // Future implementation for network data fetching
     }
+
+    // Add this method to SightingRepository.kt
+    /**
+     * Get filtered sightings based on search criteria
+     */
+    fun getFilteredSightings(
+        shape: String? = null,
+        city: String? = null,
+        country: String? = null,
+        state: String? = null,
+        startDate: String? = null,
+        endDate: String? = null,
+        searchText: String? = null
+    ): Flow<List<Sighting>> {
+        return sightingDao.getFilteredSightings(
+            shape, city, country, state, startDate, endDate, searchText
+        )
+    }
 }

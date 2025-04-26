@@ -1,46 +1,20 @@
-package com.ufomap.ufosightingmap.ui
+/// Update the MapScreen.kt file with these changes
 
-import android.annotation.SuppressLint
-import android.graphics.drawable.Drawable
-import android.util.Log
-import android.widget.Toast
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
+// Import statements to add
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import com.ufomap.ufosightingmap.R
-import com.ufomap.ufosightingmap.data.Sighting
-import com.ufomap.ufosightingmap.viewmodel.MapViewModel
-import org.osmdroid.config.Configuration
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.infowindow.InfoWindow
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import com.ufomap.ufosightingmap.data.FilterState
 
-// Default map location
-val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795)
-const val INITIAL_ZOOM_LEVEL = 4.0
+// In the MapScreen function, add these modifications:
 
 @SuppressLint("StateFlowValueCalledInComposition")
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,12 +26,14 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Correctly collect state from ViewModel's StateFlow
+    // Collect states from ViewModel
     val sightings: List<Sighting> by viewModel.sightings.collectAsState()
-    // Correct check for loading state
-    val isLoading = sightings.isEmpty() && viewModel.sightings.value.isEmpty()
+    val filterState by viewModel.filterState.collectAsState()
 
+    val isLoading = sightings.isEmpty() && viewModel.sightings.value.isEmpty()
     var mapView: MapView? by remember { mutableStateOf(null) }
+    var showFilterSheet by remember { mutableStateOf(false) }
+    val bottomSheetState = rememberModalBottomSheetState()
 
     val defaultMarkerIcon: Drawable? = remember {
         ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
@@ -66,6 +42,7 @@ fun MapScreen(
 
     var locationOverlay: MyLocationNewOverlay? by remember { mutableStateOf(null) }
 
+    // Lifecycle handling (keep existing code)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -92,7 +69,43 @@ fun MapScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("UFO Sighting Map (OSM)") })
+            Column {
+                // Top app bar with filter action
+                TopAppBar(
+                    title = { Text("UFO Sighting Map") },
+                    actions = {
+                        // Filter button
+                        IconButton(onClick = { showFilterSheet = true }) {
+                            Icon(
+                                Icons.Default.FilterList,
+                                contentDescription = "Filter"
+                            )
+                        }
+
+                        // Badge showing filtered count if filters applied
+                        if (filterState.hasActiveFilters()) {
+                            Badge(
+                                modifier = Modifier.padding(top = 4.dp, end = 4.dp)
+                            ) {
+                                Text(sightings.size.toString())
+                            }
+                        }
+                    }
+                )
+
+                // Add search bar
+                SearchBar(
+                    initialQuery = filterState.searchText ?: "",
+                    onQueryChanged = { viewModel.updateSearchQuery(it) }
+                )
+
+                // Show active filters as chips if any are applied
+                ActiveFilterChips(
+                    filterState = filterState,
+                    onClearFilter = { viewModel.clearFilter(it) },
+                    onClearAll = { viewModel.clearFilters() }
+                )
+            }
         }
     ) { paddingValues ->
         Box(
@@ -100,10 +113,12 @@ fun MapScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Map view (keep existing implementation)
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     MapView(ctx).apply {
+                        // Keep existing map setup code
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         setBuiltInZoomControls(true)
@@ -124,6 +139,7 @@ fun MapScreen(
                     }
                 },
                 update = { view ->
+                    // Keep existing marker update code
                     Log.d("MapScreen", "Updating MapView with ${sightings.size} sightings.")
 
                     val overlaysToRemove = view.overlays.filterIsInstance<Marker>()
@@ -142,23 +158,12 @@ fun MapScreen(
                                     icon = defaultMarkerIcon
                                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
 
-                                    // Store the sighting data object with the marker
                                     relatedObject = sighting
-
-                                    // Use the SightingInfoWindow with navigation callback
                                     infoWindow = SightingInfoWindow(view, onSightingClick)
 
                                     setOnMarkerClickListener { marker, mapView ->
                                         InfoWindow.closeAllInfoWindowsOn(mapView)
                                         marker.showInfoWindow()
-
-                                        // We could directly navigate here, but we're choosing to show
-                                        // the info window first and let the user click for details
-                                        /*
-                                        (marker.relatedObject as? Sighting)?.id?.let { sightingId ->
-                                            onSightingClick(sightingId)
-                                        }
-                                        */
                                         true
                                     }
                                 }
@@ -172,7 +177,7 @@ fun MapScreen(
                 }
             )
 
-            // User location centering button
+            // Location button (keep existing implementation)
             FloatingActionButton(
                 onClick = {
                     locationOverlay?.let { overlay ->
@@ -194,17 +199,29 @@ fun MapScreen(
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                // Using a drawable resource for the location icon
                 Icon(
                     painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
                     contentDescription = "My Location"
                 )
             }
 
-            // Show loading indicator if needed
+            // Show loading indicator
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
         }
+    }
+
+    // Show filter bottom sheet if needed
+    if (showFilterSheet) {
+        FilterBottomSheet(
+            filterState = filterState,
+            onDismiss = { showFilterSheet = false },
+            onApplyFilters = { shape, state, country ->
+                viewModel.updateFilters(shape = shape, state = state, country = country)
+            },
+            onClearFilters = { viewModel.clearFilters() },
+            sheetState = bottomSheetState
+        )
     }
 }
