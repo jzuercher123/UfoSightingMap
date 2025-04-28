@@ -14,7 +14,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
-
 /**
  * ViewModel for the sighting submission screen
  * Handles the submission of new UFO sightings by users

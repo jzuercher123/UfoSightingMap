@@ -5,7 +5,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.kotlin.compose) // Apply the Compose Compiler plugin using alias
 }
 
 android {
@@ -54,37 +54,39 @@ android {
     buildFeatures {
         compose = true
     }
-    composeOptions {
-        // Updated to match Kotlin 2.0.21
-        kotlinCompilerExtensionVersion = "1.5.8"
-    }
-    packaging {
+
+    // composeOptions block removed - handled by the compose compiler plugin now
+
+    // Corrected packagingOptions block
+    packagingOptions {
         resources {
-            excludes += "/META-INF/{AL2.0,LGPL2.1}"
-            excludes += "META-INF/INDEX.LIST"
-            excludes += "META-INF/dependencies"
+            excludes.add("/META-INF/{AL2.0,LGPL2.1}")
+            excludes.add("META-INF/INDEX.LIST")
+            excludes.add("META-INF/dependencies")
         }
     }
-}
+} // End of android block
 
 dependencies {
     // Core Android libraries
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
+    implementation("androidx.activity:activity-compose:1.8.2") // Ensure this is a recent compatible version
 
-    // Material Components library for XML themes
+    // Material Components library for XML themes (needed for Activity theme)
     implementation("com.google.android.material:material:1.11.0")
 
-    // Jetpack Compose BOM - updated to more recent version
+    // Jetpack Compose BOM
     implementation(platform("androidx.compose:compose-bom:2024.02.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0") // Use explicit version if needed
 
     // osmdroid Dependencies
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    implementation("org.osmdroid:osmdroid-android:6.1.18") // Consider checking for latest stable version
     implementation("androidx.preference:preference-ktx:1.2.1") // For osmdroid configuration
 
     // Room Database
@@ -93,32 +95,22 @@ dependencies {
     kapt("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
 
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose")
-
-    // Make sure you have osmdroid dependencies
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
-
     // Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3") // Use latest stable
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3") // Match android version
 
     // Lifecycle ViewModel
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     // Gson for JSON parsing
     implementation("com.google.code.gson:gson:2.10.1")
 
     // Material icon support
-    implementation("androidx.compose.material:material-icons-extended:1.5.4")
+    implementation("androidx.compose.material:material-icons-extended:1.5.4") // Check BOM alignment or use latest stable
 
     // Navigation
-    implementation("androidx.navigation:navigation-compose:2.7.6")
+    implementation("androidx.navigation:navigation-compose:2.7.6") // Use latest stable
 
     // Testing dependencies
     testImplementation("junit:junit:4.13.2")

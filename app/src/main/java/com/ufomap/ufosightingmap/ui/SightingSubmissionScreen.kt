@@ -54,6 +54,11 @@ fun SightingSubmissionScreen(
 
     // Form state
     var dateTime by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    var selectedDate by remember { mutableStateOf<Long?>(null) }
+    var selectedTime by remember { mutableStateOf<Long?>(null) }
+
     var city by remember { mutableStateOf("") }
     var state by remember { mutableStateOf("") }
     var country by remember { mutableStateOf("USA") }
@@ -68,6 +73,21 @@ fun SightingSubmissionScreen(
 
     // Context for location access
     val context = LocalContext.current
+
+    // Validation state
+    var dateTimeError by remember { mutableStateOf(false) }
+    var cityError by remember { mutableStateOf(false) }
+    var countryError by remember { mutableStateOf(false) }
+    var summaryError by remember { mutableStateOf(false) }
+    var locationError by remember { mutableStateOf(false) }
+
+    // Shape dropdown state
+    var shapeExpanded by remember { mutableStateOf(false) }
+    val shapeOptions = listOf(
+        "Light", "Triangle", "Circle", "Formation", "Disk",
+        "Sphere", "Fireball", "Cigar", "Unknown", "Other",
+        "Oval", "Chevron", "Teardrop", "Diamond", "Changing"
+    )
 
     // Location updates
     LaunchedEffect(useCurrentLocation) {

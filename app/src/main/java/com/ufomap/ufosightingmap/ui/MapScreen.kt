@@ -7,6 +7,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth // Import fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -36,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -61,7 +63,7 @@ private val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795) // Center of USA
 fun MapScreen(
     viewModel: MapViewModel,
     onSightingClick: (Int) -> Unit,
-    onReportSighting: () -> Unit // New parameter for navigation to submission screen
+    onReportSighting: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -80,7 +82,6 @@ fun MapScreen(
             ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
     }
 
-    // Try to load a different icon for user submissions, fallback to default if not found
     val userSubmittedMarkerIcon: Drawable? = remember {
         ContextCompat.getDrawable(context, R.drawable.ic_marker_user_submitted)
             ?: defaultMarkerIcon
@@ -152,12 +153,64 @@ fun MapScreen(
                     onClearAll = { viewModel.clearFilters() }
                 )
             }
+        },
+        // *** Define the floatingActionButton parameter for Scaffold ***
+        floatingActionButton = {
+            // Use a Box to contain and align the two FABs
+            Box(
+                modifier = Modifier.fillMaxWidth() // Take available width
+            ) {
+                // My Location button (Aligned to BottomEnd within the FAB container)
+                FloatingActionButton(
+                    onClick = {
+                        locationOverlay?.let { overlay ->
+                            if (overlay.myLocation != null) {
+                                mapView?.controller?.animateTo(overlay.myLocation)
+                                mapView?.controller?.setZoom(15.0)
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Location not available. Make sure location is enabled.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd) // Align within the container Box
+                        .padding(16.dp), // Padding from the edges of the container
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ) {
+                    Icon(
+                        painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
+                        contentDescription = "My Location"
+                    )
+                }
+
+                // Report Sighting button (Aligned to BottomStart within the FAB container)
+                FloatingActionButton(
+                    onClick = onReportSighting,
+                    modifier = Modifier
+                        .align(Alignment.BottomStart) // Align within the container Box
+                        .padding(16.dp), // Padding from the edges of the container
+                    containerColor = MaterialTheme.colorScheme.secondary,
+                    contentColor = MaterialTheme.colorScheme.onSecondary
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Report Sighting"
+                    )
+                }
+            }
         }
+        // *** End of floatingActionButton parameter ***
     ) { paddingValues ->
+        // The main content area (Map and Loading Indicator)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(paddingValues) // Apply padding from Scaffold correctly
         ) {
             // Map view
             AndroidView(
@@ -186,15 +239,14 @@ fun MapScreen(
                 update = { view ->
                     Log.d("MapScreen", "Updating MapView with ${sightings.size} sightings.")
 
-                    val overlaysToRemove = view.overlays.filterIsInstance<Marker>()
-                        .filter { it.id != null }
-                    view.overlays.removeAll(overlaysToRemove)
+                    val markersToRemove = view.overlays.filterIsInstance<Marker>()
+                        .filter { it.relatedObject is Sighting }
+                    view.overlays.removeAll(markersToRemove)
 
                     if (sightings.isNotEmpty()) {
                         Log.d("MapScreen", "Creating ${sightings.size} markers")
                         try {
                             sightings.forEach { sighting ->
-                                // Select appropriate marker icon based on whether this is a user submission
                                 val markerIcon = if (sighting.isUserSubmitted) {
                                     userSubmittedMarkerIcon ?: defaultMarkerIcon
                                 } else {
@@ -208,13 +260,11 @@ fun MapScreen(
                                     snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
                                     icon = markerIcon
                                     setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-
                                     relatedObject = sighting
                                     infoWindow = SightingInfoWindow(view, onSightingClick)
-
-                                    setOnMarkerClickListener { marker, mapView ->
-                                        InfoWindow.closeAllInfoWindowsOn(mapView)
-                                        marker.showInfoWindow()
+                                    setOnMarkerClickListener { m, mv ->
+                                        InfoWindow.closeAllInfoWindowsOn(mv)
+                                        m.showInfoWindow()
                                         true
                                     }
                                 }
@@ -223,60 +273,25 @@ fun MapScreen(
                         } catch (e: Exception) {
                             Log.e("MapScreen", "Error creating markers", e)
                         }
+                    } else {
+                        Log.d("MapScreen", "No sightings to display markers for.")
                     }
                     view.invalidate()
                 }
             )
 
-            // My Location button (bottom right)
-            FloatingActionButton(
-                onClick = {
-                    locationOverlay?.let { overlay ->
-                        if (overlay.myLocation != null) {
-                            mapView?.controller?.animateTo(overlay.myLocation)
-                            mapView?.controller?.setZoom(15.0)
-                        } else {
-                            Toast.makeText(
-                                context,
-                                "Location not available. Make sure location is enabled.",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Icon(
-                    painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
-                    contentDescription = "My Location"
-                )
-            }
-
-            // Report Sighting button (bottom left)
-            FloatingActionButton(
-                onClick = onReportSighting,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp),
-                containerColor = MaterialTheme.colorScheme.secondary,
-                contentColor = MaterialTheme.colorScheme.onSecondary
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Report Sighting"
-                )
-            }
+            // --- FABs are now removed from here ---
 
             // Show loading indicator
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .zIndex(1f) // Still good to keep this on top of map
+                )
             }
-        }
-    }
+        } // End of main content Box
+    } // End of Scaffold
 
     // Show filter bottom sheet if needed
     if (showFilterSheet) {
@@ -290,4 +305,4 @@ fun MapScreen(
             sheetState = bottomSheetState
         )
     }
-}
+} // End of MapScreen composable
