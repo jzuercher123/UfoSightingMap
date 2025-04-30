@@ -2,14 +2,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Network permissions -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Location permissions -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- Storage permissions - needed by OSMDroid for tile caching -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
+    <!-- Required for Android 11+ to access the shared storage -->
+    <queries>
+        <package android:name="org.openstreetmap.osmand" />
+        <package android:name="org.openstreetmap.osmand.plus" />
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -20,13 +29,15 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.UFOSightings"
+        android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"
         tools:targetApi="31">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:label="@string/ufosightingmap"
-            android:theme="@style/Theme.UFOSightings">
+            android:theme="@style/Theme.UFOSightings"
+            android:configChanges="orientation|screenSize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

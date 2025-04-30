@@ -1,6 +1,7 @@
 package com.ufomap.ufosightingmap.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.ufomap.ufosightingmap.data.AppDatabase
@@ -12,8 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,16 +30,22 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     val sightings: StateFlow<List<Sighting>>
 
     init {
+        Log.d("MapViewModel", "Initializing MapViewModel")
+
         val sightingDao = AppDatabase.getDatabase(application).sightingDao()
         repository = SightingRepository(sightingDao, application.applicationContext)
 
         // Initialize the database with data from JSON if it's empty
-        repository.initializeDatabaseIfNeeded(viewModelScope)
+        viewModelScope.launch {
+            Log.d("MapViewModel", "Checking database state")
+            repository.initializeDatabaseIfNeeded(viewModelScope)
+        }
 
         // Create a flow that changes whenever the filter state changes
         @OptIn(ExperimentalCoroutinesApi::class)
         sightings = _filterState
             .flatMapLatest { filterState ->
+                Log.d("MapViewModel", "Filter state changed: ${filterState.hasActiveFilters()}")
                 if (filterState.hasActiveFilters()) {
                     repository.getFilteredSightings(
                         shape = filterState.shape,
@@ -48,9 +55,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                         startDate = filterState.startDate,
                         endDate = filterState.endDate,
                         searchText = filterState.searchText
-                    )
+                    ).onEach { list ->
+                        Log.d("MapViewModel", "Filtered sightings flow emitted ${list.size} items")
+                    }
                 } else {
-                    repository.allSightings
+                    repository.allSightings.onEach { list ->
+                        Log.d("MapViewModel", "All sightings flow emitted ${list.size} items")
+                    }
                 }
             }
             .stateIn(
@@ -58,12 +69,15 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 started = SharingStarted.WhileSubscribed(5000L),
                 initialValue = emptyList()
             )
+
+        Log.d("MapViewModel", "MapViewModel initialization complete")
     }
 
     /**
      * Update the search text and apply filter
      */
     fun updateSearchQuery(query: String) {
+        Log.d("MapViewModel", "Updating search query: '$query'")
         _filterState.value = _filterState.value.copy(
             searchText = query.takeIf { it.isNotBlank() },
             isFilterApplied = query.isNotBlank() || _filterState.value.hasActiveFilters()
@@ -81,6 +95,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         startDate: String? = _filterState.value.startDate,
         endDate: String? = _filterState.value.endDate
     ) {
+        Log.d("MapViewModel", "Updating filters - shape: $shape, state: $state, country: $country")
         _filterState.value = _filterState.value.copy(
             shape = shape,
             city = city,
@@ -96,6 +111,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
      * Clear a specific filter
      */
     fun clearFilter(filterName: String) {
+        Log.d("MapViewModel", "Clearing filter: $filterName")
         _filterState.value = when (filterName) {
             "shape" -> _filterState.value.copy(shape = null)
             "city" -> _filterState.value.copy(city = null)
@@ -116,6 +132,7 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
      * Clear all filters
      */
     fun clearFilters() {
+        Log.d("MapViewModel", "Clearing all filters")
         _filterState.value = FilterState()
     }
 }

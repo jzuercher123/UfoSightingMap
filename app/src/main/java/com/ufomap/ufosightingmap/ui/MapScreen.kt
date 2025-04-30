@@ -1,5 +1,7 @@
 package com.ufomap.ufosightingmap.ui
 
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import android.annotation.SuppressLint
 import android.graphics.drawable.Drawable
 import android.util.Log
@@ -7,7 +9,7 @@ import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth // Import fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -19,7 +21,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -37,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -51,7 +53,6 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.infowindow.InfoWindow
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import androidx.compose.ui.viewinterop.AndroidView
 
 // Constants for map initialization
 private const val INITIAL_ZOOM_LEVEL = 4.5
@@ -72,10 +73,21 @@ fun MapScreen(
     val sightings: List<Sighting> by viewModel.sightings.collectAsState()
     val filterState by viewModel.filterState.collectAsState()
 
-    val isLoading = sightings.isEmpty() && viewModel.sightings.value.isEmpty()
+    var isLoading by remember { mutableStateOf(true) }
     var mapView: MapView? by remember { mutableStateOf(null) }
     var showFilterSheet by remember { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState()
+
+    LaunchedEffect(sightings) {
+        Log.d("MapScreen", "LaunchedEffect triggered. Sightings count: ${sightings.size}")
+        if (sightings.isNotEmpty()) {
+            isLoading = false
+        } else {
+            // Set a timeout in case database is truly empty
+            delay(5000)
+            isLoading = false
+        }
+    }
 
     val defaultMarkerIcon: Drawable? = remember {
         ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
@@ -153,64 +165,13 @@ fun MapScreen(
                     onClearAll = { viewModel.clearFilters() }
                 )
             }
-        },
-        // *** Define the floatingActionButton parameter for Scaffold ***
-        floatingActionButton = {
-            // Use a Box to contain and align the two FABs
-            Box(
-                modifier = Modifier.fillMaxWidth() // Take available width
-            ) {
-                // My Location button (Aligned to BottomEnd within the FAB container)
-                FloatingActionButton(
-                    onClick = {
-                        locationOverlay?.let { overlay ->
-                            if (overlay.myLocation != null) {
-                                mapView?.controller?.animateTo(overlay.myLocation)
-                                mapView?.controller?.setZoom(15.0)
-                            } else {
-                                Toast.makeText(
-                                    context,
-                                    "Location not available. Make sure location is enabled.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd) // Align within the container Box
-                        .padding(16.dp), // Padding from the edges of the container
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                ) {
-                    Icon(
-                        painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
-                        contentDescription = "My Location"
-                    )
-                }
-
-                // Report Sighting button (Aligned to BottomStart within the FAB container)
-                FloatingActionButton(
-                    onClick = onReportSighting,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart) // Align within the container Box
-                        .padding(16.dp), // Padding from the edges of the container
-                    containerColor = MaterialTheme.colorScheme.secondary,
-                    contentColor = MaterialTheme.colorScheme.onSecondary
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Report Sighting"
-                    )
-                }
-            }
         }
-        // *** End of floatingActionButton parameter ***
     ) { paddingValues ->
         // The main content area (Map and Loading Indicator)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Apply padding from Scaffold correctly
+                .padding(paddingValues)
         ) {
             // Map view
             AndroidView(
@@ -280,18 +241,61 @@ fun MapScreen(
                 }
             )
 
-            // --- FABs are now removed from here ---
+            // Report Sighting button (moved outside of Scaffold's floatingActionButton)
+            FloatingActionButton(
+                onClick = onReportSighting,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(16.dp)
+                    .zIndex(2f), // Ensure it appears above the map
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Report Sighting"
+                )
+            }
+
+            // My Location button (moved outside of Scaffold's floatingActionButton)
+            FloatingActionButton(
+                onClick = {
+                    locationOverlay?.let { overlay ->
+                        if (overlay.myLocation != null) {
+                            mapView?.controller?.animateTo(overlay.myLocation)
+                            mapView?.controller?.setZoom(15.0)
+                        } else {
+                            Toast.makeText(
+                                context,
+                                "Location not available. Make sure location is enabled.",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .zIndex(2f), // Ensure it appears above the map
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
+                Icon(
+                    painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
+                    contentDescription = "My Location"
+                )
+            }
 
             // Show loading indicator
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .zIndex(1f) // Still good to keep this on top of map
+                        .zIndex(3f) // Keep this on top of everything
                 )
             }
-        } // End of main content Box
-    } // End of Scaffold
+        }
+    }
 
     // Show filter bottom sheet if needed
     if (showFilterSheet) {
@@ -305,4 +309,4 @@ fun MapScreen(
             sheetState = bottomSheetState
         )
     }
-} // End of MapScreen composable
+}

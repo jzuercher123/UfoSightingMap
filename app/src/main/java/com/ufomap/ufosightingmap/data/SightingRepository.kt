@@ -47,11 +47,15 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
      * Load sightings from the JSON asset file and insert them into the database.
      * Called during initialization if the database is empty.
      */
+    // In SightingRepository.kt, modify loadSightingsFromJsonAndInsert()
     private suspend fun loadSightingsFromJsonAndInsert() {
         try {
+            Log.d("SightingRepository", "Attempting to load sightings from JSON")
             val sightingsList = loadSightingsFromJson(context, "sightings.json")
+            Log.d("SightingRepository", "JSON parsing result: ${sightingsList?.size ?: "null"} sightings")
+
             if (sightingsList != null && sightingsList.isNotEmpty()) {
-                Log.d("SightingRepository", "Loaded ${sightingsList.size} sightings, inserting into database")
+                Log.d("SightingRepository", "Inserting ${sightingsList.size} sightings into database")
                 sightingDao.insertAll(sightingsList)
                 Log.d("SightingRepository", "Successfully loaded sightings from JSON.")
             } else {
@@ -96,4 +100,6 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     fun getUserSubmissions(submittedBy: String): Flow<List<Sighting>> {
         return sightingDao.getUserSubmissions(submittedBy)
     }
+
+
 }
