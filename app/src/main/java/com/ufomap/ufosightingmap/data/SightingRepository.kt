@@ -6,6 +6,7 @@ import com.ufomap.ufosightingmap.utils.loadSightingsFromJson
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 /**
@@ -15,7 +16,9 @@ import kotlinx.coroutines.launch
 class SightingRepository(private val sightingDao: SightingDao, private val context: Context) {
 
     // Expose all sightings as a Flow for reactive UI updates
-    val allSightings: Flow<List<Sighting>> = sightingDao.getAllSightings()
+    val allSightings: Flow<List<Sighting>> = sightingDao.getAllSightings().onEach { list ->
+        Log.d("SightingRepository", "Flow emitted ${list.size} sightings")
+    }
 
     /**
      * Get sightings within a geographical boundary
@@ -44,10 +47,49 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     }
 
     /**
+     * Force clear the database and reload data from JSON
+     */
+    suspend fun forceReloadData() {
+        try {
+            Log.d("SightingRepository", "Forcing database clear and reload")
+            // Clear existing data
+            sightingDao.clearAllSightings()
+            // Load JSON data
+            loadSightingsFromJsonAndInsert()
+        } catch (e: Exception) {
+            Log.e("SightingRepository", "Error during force reload: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Debug function to check if we can access asset files
+     */
+    fun debugAssetFiles() {
+        try {
+            val files = context.assets.list("")
+            Log.d("SightingRepository", "Asset files: ${files?.joinToString()}")
+
+            if (files?.contains("sightings.json") == true) {
+                val jsonSize = context.assets.open("sightings.json").available()
+                Log.d("SightingRepository", "sightings.json file size: $jsonSize bytes")
+
+                // Read the first 100 chars to verify content
+                val start = context.assets.open("sightings.json").bufferedReader().use {
+                    it.readText().take(100)
+                }
+                Log.d("SightingRepository", "JSON starts with: $start...")
+            } else {
+                Log.e("SightingRepository", "sightings.json NOT FOUND in assets")
+            }
+        } catch (e: Exception) {
+            Log.e("SightingRepository", "Error checking assets: ${e.message}", e)
+        }
+    }
+
+    /**
      * Load sightings from the JSON asset file and insert them into the database.
      * Called during initialization if the database is empty.
      */
-    // In SightingRepository.kt, modify loadSightingsFromJsonAndInsert()
     private suspend fun loadSightingsFromJsonAndInsert() {
         try {
             Log.d("SightingRepository", "Attempting to load sightings from JSON")
@@ -74,7 +116,6 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
         // Future implementation for network data fetching
     }
 
-    // Add this method to SightingRepository.kt
     /**
      * Get filtered sightings based on search criteria
      */
@@ -100,6 +141,4 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     fun getUserSubmissions(submittedBy: String): Flow<List<Sighting>> {
         return sightingDao.getUserSubmissions(submittedBy)
     }
-
-
 }

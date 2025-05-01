@@ -35,10 +35,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
         val sightingDao = AppDatabase.getDatabase(application).sightingDao()
         repository = SightingRepository(sightingDao, application.applicationContext)
 
-        // Initialize the database with data from JSON if it's empty
+        // Debug asset files first to check if they're accessible
+        repository.debugAssetFiles()
+
+        // Force reload data instead of just checking
         viewModelScope.launch {
-            Log.d("MapViewModel", "Checking database state")
-            repository.initializeDatabaseIfNeeded(viewModelScope)
+            Log.d("MapViewModel", "Forcing data reload")
+            repository.forceReloadData()
         }
 
         // Create a flow that changes whenever the filter state changes

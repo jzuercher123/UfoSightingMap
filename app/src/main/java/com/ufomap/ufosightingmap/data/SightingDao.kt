@@ -25,6 +25,10 @@ interface SightingDao {
     @Query("SELECT COUNT(*) FROM sightings")
     suspend fun count(): Int
 
+    // Clear all sightings from the database
+    @Query("DELETE FROM sightings")
+    suspend fun clearAllSightings()
+
     // Get a specific sighting by ID
     @Query("SELECT * FROM sightings WHERE id = :id LIMIT 1")
     fun getSightingById(id: Int): Flow<Sighting?>
