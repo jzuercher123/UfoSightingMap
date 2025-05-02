@@ -6,6 +6,8 @@ pluginManagement {
         google() // Google's Maven repository (for Android Gradle Plugin, etc.)
         mavenCentral() // Standard Maven Central repository
         gradlePluginPortal() // Gradle's official plugin portal
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") // Add this line
+
     }
 }
 
@@ -18,7 +20,9 @@ dependencyResolutionManagement {
     repositories {
         google() // Google's Maven repository (for AndroidX, Play Services, etc.)
         mavenCentral() // Standard Maven Central repository
-        maven { url = uri("https://jitpack.io") } // <-- Added repository for JitPack libraries (like osmdroid-compose)
+        maven { url = uri("https://jitpack.io") }
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev") // Add this line
+// <-- Added repository for JitPack libraries (like osmdroid-compose)
     }
 }
 

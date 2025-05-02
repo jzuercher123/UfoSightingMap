@@ -4,8 +4,9 @@ import java.io.FileInputStream
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
-    alias(libs.plugins.kotlin.compose) // Apply the Compose Compiler plugin using alias
+    alias(libs.plugins.jetbrains.compose)
+
+    alias(libs.plugins.kotlin.kapt)
 }
 
 android {
@@ -94,6 +95,10 @@ dependencies {
     implementation("androidx.room:room-runtime:$room_version")
     kapt("androidx.room:room-compiler:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
+
+    implementation(libs.androidx.room.runtime)
+    kapt(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3") // Use latest stable

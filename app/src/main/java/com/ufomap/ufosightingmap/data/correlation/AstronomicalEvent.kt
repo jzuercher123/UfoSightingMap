@@ -1,7 +1,4 @@
-package com.ufomap.ufosightingmap.data.correlation
-
-class AstronomicalEvent {
-}package com.ufomap.ufosightingmap.data.correlation.models
+package com.ufomap.ufosightingmap.data.correlation.models
 
 import androidx.room.Entity
 import androidx.room.Index

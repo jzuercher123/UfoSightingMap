@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Correlation Analysis Screen Titles -->
+    <string name="correlation_analysis">Correlation Analysis</string>
+    <string name="military_base_correlation">Military Base Correlation</string>
+    <string name="astronomical_correlation">Astronomical Correlation</string>
+    <string name="weather_correlation">Weather Correlation</string>
+    <string name="population_correlation">Population Correlation</string>
+
+    <!-- Tab Titles -->
+    <string name="tab_military">Military Bases</string>
+    <string name="tab_astronomy">Astronomy</string>
+    <string name="tab_weather">Weather</string>
+    <string name="tab_population">Population</string>
+
+    <!-- General Correlation UI -->
+    <string name="apply_filters">Apply Filters</string>
+    <string name="clear_filters">Clear Filters</string>
+    <string name="reset_analysis">Reset Analysis</string>
+    <string name="correlation_info">Information about correlations</string>
+
+    <!-- Military Base Correlation -->
+    <string name="military_base_description">Analysis of the relationship between UFO sightings and proximity to military installations.</string>
+    <string name="military_bases_count">Military Bases</string>
+    <string name="proximity_radius">Proximity Radius</string>
+    <string name="radius_description">Adjust the radius to see how many UFO sightings occur within a specific distance of military installations.</string>
+    <string name="distance_distribution">Sighting Distribution by Distance</string>
+    <string name="closest_sightings">Closest Sightings to Military Bases</string>
+    <string name="distance_km">%1$d km</string>
+
+    <!-- Astronomical Correlation -->
+    <string name="astronomical_description">Analysis of the relationship between UFO sightings and astronomical events.</string>
+    <string name="event_count">Astronomical Events</string>
+    <string name="events_during">Sightings During Events</string>
+    <string name="event_types">Sightings by Event Type</string>
+    <string name="meteor_correlation">Meteor Shower Correlation</string>
+    <string name="sightings_during_events">Sightings During Events</string>
+
+    <!-- Weather Correlation -->
+    <string name="weather_description">Analysis of the relationship between UFO sightings and weather conditions.</string>
+    <string name="unusual_weather">Unusual Weather</string>
+    <string name="weather_type_correlation">Sightings by Weather Type</string>
+    <string name="thunderstorm_correlation">Thunderstorm Correlation</string>
+    <string name="visibility_conditions">Visibility Conditions</string>
+
+    <!-- Population Correlation -->
+    <string name="population_description">Analysis of the relationship between UFO sightings and population density.</string>
+    <string name="sightings_per_capita">Sightings Per Capita</string>
+    <string name="urban_rural">Urban vs Rural Distribution</string>
+    <string name="population_density">Population Density</string>
+    <string name="demographic_factors">Demographic Factors</string>
+
+    <!-- Research Basis -->
+    <string name="research_basis">Research Basis</string>
+    <string name="military_research_basis">Research shows a strong relationship between UFO sightings and proximity to military installations, with studies finding that 61% of all UFO sightings occur within 24 miles of a military installation, and 82% within 42 miles.</string>
+    <string name="astronomical_research_basis">Many studies indicate that astronomical phenomena are often misidentified as UFOs. Analysis shows strong correlations between meteor shower peaks and \'fireball\' UFO reports, as well as between satellite passes and \'formation\' sightings.</string>
+    <string name="weather_research_basis">Research has shown correlations between unusual weather conditions (particularly thunderstorms, temperature inversions, and fog) and reported UFO sightings. These conditions can create optical illusions and unusual light refraction.</string>
+    <string name="population_research_basis">Studies have found a sub-linear relationship between population density and UFO sightings, indicating that while more people means more potential observers, the relationship is not directly proportional.</string>
+
+    <!-- Methods -->
+    <string name="methodology">Methodology</string>
+    <string name="haversine_method">Method: Haversine formula used to calculate great-circle distances between sighting coordinates and military base locations.</string>
+    <string name="date_correlation_method">Method: Date correlation between astronomical event periods and UFO sighting reports.</string>
+    <string name="weather_correlation_method">Method: Spatiotemporal correlation between weather events and UFO sightings within 50km and 24 hours.</string>
+    <string name="population_method">Method: Sightings normalized by population density to identify deviations from expected distribution.</string>
+
+    <!-- Data Sources -->
+    <string name="data_sources">Data Sources</string>
+    <string name="military_data_source">Data sources: US Government Military Installation Database, National UFO Reporting Center (NUFORC).</string>
+    <string name="astronomical_data_source">Data sources: International Meteor Organization, NASA/JPL, Space-Track.org, National UFO Reporting Center (NUFORC).</string>
+    <string name="weather_data_source">Data sources: National Weather Service, NOAA Storm Events Database, National UFO Reporting Center (NUFORC).</string>
+    <string name="population_data_source">Data sources: US Census Bureau, World Bank population data, National UFO Reporting Center (NUFORC).</string>
+</resources>

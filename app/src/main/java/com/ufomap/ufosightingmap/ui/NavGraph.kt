@@ -1,8 +1,10 @@
 package com.ufomap.ufosightingmap.ui
 
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -14,11 +16,29 @@ import com.ufomap.ufosightingmap.viewmodel.CorrelationViewModel
 import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import com.ufomap.ufosightingmap.viewmodel.SightingDetailViewModel
 import com.ufomap.ufosightingmap.viewmodel.SightingSubmissionViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Defines the navigation routes in the app
  */
 sealed class Screen(val route: String) {
+    /**
+     * Main map screen showing all sightings
+     */
+    object Map : Screen("map")
+
+    /**
+     * Detail screen for a specific sighting
+     */
+    object Detail : Screen("detail/{sightingId}") {
+        fun createRoute(sightingId: Int) = "detail/$sightingId"
+    }
+
+    /**
+     * Screen for submitting a new UFO sighting report
+     */
+    object SubmitSighting : Screen("submit")
+
     /**
      * Correlation analysis screen for data visualization
      */
@@ -32,6 +52,7 @@ sealed class Screen(val route: String) {
 fun UFOSightingsNavGraph(navController: NavHostController) {
     // Create a SnackbarHostState to show information messages
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     NavHost(
         navController = navController,
@@ -97,8 +118,8 @@ fun UFOSightingsNavGraph(navController: NavHostController) {
                     navController.navigateUp()
                 },
                 onShowInfo = { topic ->
-                    // Show information about correlation analysis
-                    viewModelScope.launch {
+                    // Show information about correlation analysis using the coroutineScope
+                    coroutineScope.launch {
                         snackbarHostState.showSnackbar(
                             message = "Information about $topic",
                             duration = SnackbarDuration.Short
@@ -108,19 +129,4 @@ fun UFOSightingsNavGraph(navController: NavHostController) {
             )
         }
     }
-} Main map screen showing all sightings
-*/
-object Map : Screen("map")
-
-/**
- * Detail screen for a specific sighting
- */
-object Detail : Screen("detail/{sightingId}") {
-    fun createRoute(sightingId: Int) = "detail/$sightingId"
 }
-
-/**
- * Screen for submitting a new UFO sighting report
- */
-object SubmitSighting : Screen("submit")
-

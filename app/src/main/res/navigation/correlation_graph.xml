@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/correlation_graph"
+    app:startDestination="@id/correlationScreen">
+
+    <fragment
+        android:id="@+id/correlationScreen"
+        android:name="com.ufomap.ufosightingmap.ui.correlation.CorrelationScreen"
+        android:label="@string/correlation_analysis"
+        tools:layout="@layout/fragment_correlation_screen">
+
+        <action
+            android:id="@+id/action_to_militaryBaseCorrelation"
+            app:destination="@id/militaryBaseCorrelationTab" />
+
+        <action
+            android:id="@+id/action_to_astronomicalCorrelation"
+            app:destination="@id/astronomicalCorrelationTab" />
+
+        <action
+            android:id="@+id/action_to_weatherCorrelation"
+            app:destination="@id/weatherCorrelationTab" />
+
+        <action
+            android:id="@+id/action_to_populationCorrelation"
+            app:destination="@id/populationCorrelationTab" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/militaryBaseCorrelationTab"
+        android:name="com.ufomap.ufosightingmap.ui.correlation.MilitaryBaseCorrelationTab"
+        android:label="@string/military_base_correlation"
+        tools:layout="@layout/fragment_military_base_correlation" />
+
+    <fragment
+        android:id="@+id/astronomicalCorrelationTab"
+        android:name="com.ufomap.ufosightingmap.ui.correlation.AstronomicalCorrelationTab"
+        android:label="@string/astronomical_correlation"
+        tools:layout="@layout/fragment_astronomical_correlation" />
+
+    <fragment
+        android:id="@+id/weatherCorrelationTab"
+        android:name="com.ufomap.ufosightingmap.ui.correlation.WeatherCorrelationTab"
+        android:label="@string/weather_correlation"
+        tools:layout="@layout/fragment_weather_correlation" />
+
+    <fragment
+        android:id="@+id/populationCorrelationTab"
+        android:name="com.ufomap.ufosightingmap.ui.correlation.PopulationCorrelationTab"
+        android:label="@string/population_correlation"
+        tools:layout="@layout/fragment_population_correlation" />
+</navigation>
