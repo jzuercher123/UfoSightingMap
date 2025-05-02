@@ -1,12 +1,16 @@
 package com.ufomap.ufosightingmap.ui
 
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.ufomap.ufosightingmap.ui.correlation.CorrelationScreen
+import com.ufomap.ufosightingmap.viewmodel.CorrelationViewModel
 import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import com.ufomap.ufosightingmap.viewmodel.SightingDetailViewModel
 import com.ufomap.ufosightingmap.viewmodel.SightingSubmissionViewModel
@@ -16,21 +20,9 @@ import com.ufomap.ufosightingmap.viewmodel.SightingSubmissionViewModel
  */
 sealed class Screen(val route: String) {
     /**
-     * Main map screen showing all sightings
+     * Correlation analysis screen for data visualization
      */
-    object Map : Screen("map")
-
-    /**
-     * Detail screen for a specific sighting
-     */
-    object Detail : Screen("detail/{sightingId}") {
-        fun createRoute(sightingId: Int) = "detail/$sightingId"
-    }
-
-    /**
-     * Screen for submitting a new UFO sighting report
-     */
-    object SubmitSighting : Screen("submit")
+    object CorrelationAnalysis : Screen("correlation")
 }
 
 /**
@@ -38,6 +30,9 @@ sealed class Screen(val route: String) {
  */
 @Composable
 fun UFOSightingsNavGraph(navController: NavHostController) {
+    // Create a SnackbarHostState to show information messages
+    val snackbarHostState = remember { SnackbarHostState() }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Map.route
@@ -52,6 +47,9 @@ fun UFOSightingsNavGraph(navController: NavHostController) {
                 },
                 onReportSighting = {
                     navController.navigate(Screen.SubmitSighting.route)
+                },
+                onShowCorrelationAnalysis = {
+                    navController.navigate(Screen.CorrelationAnalysis.route)
                 }
             )
         }
@@ -88,5 +86,41 @@ fun UFOSightingsNavGraph(navController: NavHostController) {
                 }
             )
         }
+
+        // Correlation Analysis Screen
+        composable(Screen.CorrelationAnalysis.route) {
+            val viewModel: CorrelationViewModel = viewModel()
+
+            CorrelationScreen(
+                viewModel = viewModel,
+                onNavigateBack = {
+                    navController.navigateUp()
+                },
+                onShowInfo = { topic ->
+                    // Show information about correlation analysis
+                    viewModelScope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = "Information about $topic",
+                            duration = SnackbarDuration.Short
+                        )
+                    }
+                }
+            )
+        }
     }
+} Main map screen showing all sightings
+*/
+object Map : Screen("map")
+
+/**
+ * Detail screen for a specific sighting
+ */
+object Detail : Screen("detail/{sightingId}") {
+    fun createRoute(sightingId: Int) = "detail/$sightingId"
 }
+
+/**
+ * Screen for submitting a new UFO sighting report
+ */
+object SubmitSighting : Screen("submit")
+

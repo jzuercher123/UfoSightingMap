@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
@@ -65,7 +67,8 @@ private val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795) // Center of USA
 fun MapScreen(
     viewModel: MapViewModel,
     onSightingClick: (Int) -> Unit,
-    onReportSighting: () -> Unit
+    onReportSighting: () -> Unit,
+    onShowCorrelationAnalysis: () -> Unit // New parameter for correlation navigation
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -146,6 +149,14 @@ fun MapScreen(
                 TopAppBar(
                     title = { Text("UFO Sighting Map") },
                     actions = {
+                        // Analysis button - NEW!
+                        IconButton(onClick = onShowCorrelationAnalysis) {
+                            Icon(
+                                Icons.Default.Analytics,
+                                contentDescription = "Correlation Analysis"
+                            )
+                        }
+
                         // Filter button
                         IconButton(onClick = { showFilterSheet = true }) {
                             Icon(
@@ -180,11 +191,24 @@ fun MapScreen(
             }
         },
         floatingActionButton = {
-            // Use a Box to contain and align the two FABs
-            Box(
-                modifier = Modifier.fillMaxWidth() // Take available width
+            // Use a Column to contain multiple floating action buttons
+            Column(
+                horizontalAlignment = Alignment.End
             ) {
-                // My Location button (Aligned to BottomEnd within the FAB container)
+                // Correlation Analysis button - if you want it here instead
+                FloatingActionButton(
+                    onClick = onShowCorrelationAnalysis,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    containerColor = MaterialTheme.colorScheme.tertiary,
+                    contentColor = MaterialTheme.colorScheme.onTertiary
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Analytics,
+                        contentDescription = "Analyze Data"
+                    )
+                }
+
+                // My Location button
                 FloatingActionButton(
                     onClick = {
                         locationOverlay?.let { overlay ->
@@ -200,9 +224,7 @@ fun MapScreen(
                             }
                         }
                     },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd) // Align within the container Box
-                        .padding(16.dp), // Padding from the edges of the container
+                    modifier = Modifier.padding(vertical = 8.dp),
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
@@ -212,12 +234,10 @@ fun MapScreen(
                     )
                 }
 
-                // Report Sighting button (Aligned to BottomStart within the FAB container)
+                // Report Sighting button
                 FloatingActionButton(
                     onClick = onReportSighting,
-                    modifier = Modifier
-                        .align(Alignment.BottomStart) // Align within the container Box
-                        .padding(16.dp), // Padding from the edges of the container
+                    modifier = Modifier.padding(vertical = 8.dp),
                     containerColor = MaterialTheme.colorScheme.secondary,
                     contentColor = MaterialTheme.colorScheme.onSecondary
                 ) {
