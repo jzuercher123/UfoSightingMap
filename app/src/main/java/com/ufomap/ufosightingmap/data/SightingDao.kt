@@ -1,7 +1,9 @@
 package com.ufomap.ufosightingmap.data
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.MapInfo
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +18,10 @@ interface SightingDao {
     // Get all sightings as a Flow
     @Query("SELECT * FROM sightings")
     fun getAllSightings(): Flow<List<Sighting>>
+
+    // Get paginated sightings for efficient loading
+    @Query("SELECT * FROM sightings ORDER BY dateTime DESC")
+    fun getSightingsPaged(): PagingSource<Int, Sighting>
 
     // Get sightings within specific geographical bounds
     @Query("SELECT * FROM sightings WHERE latitude BETWEEN :south AND :north AND longitude BETWEEN :west AND :east")
@@ -62,4 +68,17 @@ interface SightingDao {
 
     @Query("SELECT * FROM sightings WHERE submittedBy = :submittedBy ORDER BY submissionDate DESC")
     fun getUserSubmissions(submittedBy: String): Flow<List<Sighting>>
+
+    // Get recent sightings
+    @Query("SELECT * FROM sightings ORDER BY dateTime DESC LIMIT :limit")
+    fun getRecentSightings(limit: Int): Flow<List<Sighting>>
+
+    // Fixed: Get sightings by shape with proper column mapping
+    @MapInfo(keyColumn = "shape", valueColumn = "count")
+    @Query("SELECT shape, COUNT(*) as count FROM sightings WHERE shape IS NOT NULL GROUP BY shape ORDER BY count DESC")
+    fun getSightingsByShape(): Flow<Map<String, Int>>
+
+    // Search sightings by summary content
+    @Query("SELECT * FROM sightings WHERE summary LIKE '%' || :keyword || '%' ORDER BY dateTime DESC")
+    fun searchSightingsBySummary(keyword: String): Flow<List<Sighting>>
 }

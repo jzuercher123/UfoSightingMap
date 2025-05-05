@@ -32,7 +32,7 @@ interface WeatherEventDao {
     // Time-based queries
 
     /**
-     * Get current weather events (within the last 24 hours)
+     * Get weather events between dates
      */
     @Query("""
         SELECT * FROM weather_events
@@ -65,7 +65,13 @@ interface WeatherEventDao {
             )
         ) AS distance 
         FROM weather_events
-        HAVING distance <= :radiusKm
+        WHERE (
+            6371 * acos(
+                cos(radians(:latitude)) * cos(radians(latitude)) * 
+                cos(radians(longitude) - radians(:longitude)) + 
+                sin(radians(:latitude)) * sin(radians(latitude))
+            )
+        ) <= :radiusKm
         ORDER BY distance
     """)
     fun getWeatherEventsNearLocation(latitude: Double, longitude: Double, radiusKm: Double): Flow<List<WeatherEvent>>
@@ -97,30 +103,24 @@ interface WeatherEventDao {
      */
     @Query("""
         SELECT (
-            CAST(COUNT(DISTINCT CASE 
-                WHEN s.dateTime IS NOT NULL AND EXISTS (
-                    SELECT 1 FROM weather_events we
+            CAST(
+                (SELECT COUNT(DISTINCT s.id)
+                 FROM sightings s
+                 WHERE s.dateTime IS NOT NULL 
+                 AND EXISTS (
+                    SELECT 1 
+                    FROM weather_events we
                     WHERE (6371 * acos(
                         cos(radians(s.latitude)) * cos(radians(we.latitude)) * 
                         cos(radians(we.longitude) - radians(s.longitude)) + 
                         sin(radians(s.latitude)) * sin(radians(we.latitude))
                     )) <= 50
                     AND ABS(strftime('%s', s.dateTime) * 1000 - we.date) <= 86400000
-                    AND (we.type IN ('THUNDERSTORM', 'FOG', 'TEMPERATURE_INVERSION', 'TORNADO', 'SPRITES', 'BALL_LIGHTNING'))
-                ) THEN s.id 
-                ELSE NULL 
-            END) AS FLOAT) / 
-            CAST(COUNT(DISTINCT s.id) AS FLOAT)
+                    AND we.type IN ('THUNDERSTORM', 'FOG', 'TEMPERATURE_INVERSION', 'TORNADO', 'SPRITES', 'BALL_LIGHTNING')
+                 ))
+             AS FLOAT) / 
+            CAST((SELECT COUNT(*) FROM sightings) AS FLOAT)
         ) * 100 AS percentage
-        FROM sightings s
     """)
     suspend fun getUnusualWeatherSightingPercentage(): Float
 }
-
-/**
- * Data class for weather type distribution statistics
- */
-data class WeatherTypeDistribution(
-    val weather_type: WeatherEvent.WeatherType,
-    val sighting_count: Int
-)

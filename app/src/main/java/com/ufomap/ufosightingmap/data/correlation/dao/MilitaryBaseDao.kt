@@ -63,7 +63,13 @@ interface MilitaryBaseDao {
             )
         ) AS distance 
         FROM military_bases
-        HAVING distance <= :radiusKm
+        WHERE (
+            6371 * acos(
+                cos(radians(:latitude)) * cos(radians(latitude)) * 
+                cos(radians(longitude) - radians(:longitude)) + 
+                sin(radians(:latitude)) * sin(radians(latitude))
+            )
+        ) <= :radiusKm
         ORDER BY distance
     """)
     fun getBasesNearPoint(latitude: Double, longitude: Double, radiusKm: Double): Flow<List<MilitaryBase>>
@@ -86,67 +92,19 @@ interface MilitaryBaseDao {
     suspend fun getClosestBase(latitude: Double, longitude: Double): MilitaryBase?
 
     /**
-     * Calculate the distance to the nearest military base for each sighting
-     */
-    @Transaction
-    @Query("""
-        SELECT s.*, 
-        (
-            SELECT MIN(
-                6371 * acos(
-                    cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                    cos(radians(mb.longitude) - radians(s.longitude)) + 
-                    sin(radians(s.latitude)) * sin(radians(mb.latitude))
-                )
-            )
-            FROM military_bases mb
-        ) AS distance_to_nearest_base,
-        (
-            SELECT mb.id
-            FROM military_bases mb
-            ORDER BY (
-                6371 * acos(
-                    cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                    cos(radians(mb.longitude) - radians(s.longitude)) + 
-                    sin(radians(s.latitude)) * sin(radians(mb.latitude))
-                )
-            ) ASC
-            LIMIT 1
-        ) AS nearest_base_id,
-        (
-            SELECT mb.name
-            FROM military_bases mb
-            ORDER BY (
-                6371 * acos(
-                    cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                    cos(radians(mb.longitude) - radians(s.longitude)) + 
-                    sin(radians(s.latitude)) * sin(radians(mb.latitude))
-                )
-            ) ASC
-            LIMIT 1
-        ) AS nearest_base_name
-        FROM sightings s
-    """)
-    fun getSightingsWithNearestBase(): Flow<List<SightingWithBaseDistance>>
-
-    /**
      * Get sightings within a specified radius of any military base
      */
     @Transaction
     @Query("""
-        SELECT DISTINCT s.*
-        FROM sightings s
-        WHERE EXISTS (
-            SELECT 1
-            FROM military_bases mb
-            WHERE (
-                6371 * acos(
-                    cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                    cos(radians(mb.longitude) - radians(s.longitude)) + 
-                    sin(radians(s.latitude)) * sin(radians(mb.latitude))
-                )
-            ) <= :radiusKm
-        )
+        SELECT DISTINCT sightings.*
+        FROM sightings
+        JOIN military_bases ON (
+            6371 * acos(
+                cos(radians(sightings.latitude)) * cos(radians(military_bases.latitude)) * 
+                cos(radians(military_bases.longitude) - radians(sightings.longitude)) + 
+                sin(radians(sightings.latitude)) * sin(radians(military_bases.latitude))
+            )
+        ) <= :radiusKm
     """)
     fun getSightingsNearAnyBase(radiusKm: Double): Flow<List<Sighting>>
 
@@ -157,10 +115,10 @@ interface MilitaryBaseDao {
     @Query("""
         SELECT 
             CASE 
-                WHEN distance < 10 THEN '0-10 km'
-                WHEN distance < 25 THEN '10-25 km'
-                WHEN distance < 50 THEN '25-50 km'
-                WHEN distance < 100 THEN '50-100 km'
+                WHEN min_distance < 10 THEN '0-10 km'
+                WHEN min_distance < 25 THEN '10-25 km'
+                WHEN min_distance < 50 THEN '25-50 km'
+                WHEN min_distance < 100 THEN '50-100 km'
                 ELSE '100+ km'
             END AS distance_band,
             COUNT(*) as sighting_count
@@ -171,13 +129,13 @@ interface MilitaryBaseDao {
                     cos(radians(mb.longitude) - radians(s.longitude)) + 
                     sin(radians(s.latitude)) * sin(radians(mb.latitude))
                 )
-            ) AS distance
+            ) AS min_distance
             FROM sightings s
             CROSS JOIN military_bases mb
             GROUP BY s.id
-        )
+        ) AS distances
         GROUP BY distance_band
-        ORDER BY MIN(distance)
+        ORDER BY MIN(min_distance)
     """)
     fun getSightingCountsByDistanceBand(): Flow<List<DistanceDistribution>>
 
@@ -203,55 +161,23 @@ interface MilitaryBaseDao {
      */
     @Query("""
         SELECT (
-            CAST(COUNT(DISTINCT CASE 
-                WHEN MIN(
-                    6371 * acos(
-                        cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                        cos(radians(mb.longitude) - radians(s.longitude)) + 
-                        sin(radians(s.latitude)) * sin(radians(mb.latitude))
-                    )
-                ) <= :radiusKm THEN s.id 
-                ELSE NULL 
-            END) AS FLOAT) / 
-            CAST(COUNT(DISTINCT s.id) AS FLOAT)
-        ) * 100 AS percentage
-        FROM sightings s
-        CROSS JOIN military_bases mb
+            CAST(
+                (SELECT COUNT(DISTINCT s1.id)
+                 FROM sightings s1
+                 WHERE EXISTS (
+                     SELECT 1
+                     FROM military_bases mb1
+                     WHERE (
+                         6371 * acos(
+                             cos(radians(s1.latitude)) * cos(radians(mb1.latitude)) * 
+                             cos(radians(mb1.longitude) - radians(s1.longitude)) + 
+                             sin(radians(s1.latitude)) * sin(radians(mb1.latitude))
+                         )
+                     ) <= :radiusKm
+                 ))
+            AS FLOAT) / 
+            CAST((SELECT COUNT(*) FROM sightings) AS FLOAT)
+        ) * 100 
     """)
     suspend fun getPercentageSightingsWithinRadius(radiusKm: Double): Float
 }
-
-/**
- * Data class for storing sighting distance to the nearest military base
- */
-data class SightingWithBaseDistance(
-    // All fields from Sighting
-    val id: Int,
-    val dateTime: String?,
-    val city: String?,
-    val state: String?,
-    val country: String?,
-    val shape: String?,
-    val duration: String?,
-    val summary: String?,
-    val posted: String?,
-    val latitude: Double,
-    val longitude: Double,
-    val submittedBy: String?,
-    val submissionDate: String?,
-    val isUserSubmitted: Boolean,
-    val submissionStatus: String,
-
-    // Additional correlation fields
-    val distance_to_nearest_base: Double?,
-    val nearest_base_id: String?,
-    val nearest_base_name: String?
-)
-
-/**
- * Data class for distance distribution statistics
- */
-data class DistanceDistribution(
-    val distance_band: String,
-    val sighting_count: Int
-)

@@ -4,40 +4,19 @@ import android.annotation.SuppressLint
 import android.graphics.drawable.Drawable
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material3.Badge
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -47,8 +26,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.ufomap.ufosightingmap.R
 import com.ufomap.ufosightingmap.data.Sighting
+import com.ufomap.ufosightingmap.utils.MarkerClusterManager
 import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -60,29 +41,41 @@ import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 // Constants for map initialization
 private const val INITIAL_ZOOM_LEVEL = 4.5
 private val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795) // Center of USA
+private const val TAG = "MapScreen"
 
-@SuppressLint("StateFlowValueCalledInComposition")
+// Define UI states for better state management
+data class MapUiState(
+    val isLoading: Boolean = true,
+    val showFilterSheet: Boolean = false,
+    val filterApplied: Boolean = false,
+    val sightings: List<Sighting> = emptyList(),
+    val errorMessage: String? = null
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     viewModel: MapViewModel,
     onSightingClick: (Int) -> Unit,
     onReportSighting: () -> Unit,
-    onShowCorrelationAnalysis: () -> Unit // New parameter for correlation navigation
+    onShowCorrelationAnalysis: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Collect states from ViewModel
-    val sightings: List<Sighting> by viewModel.sightings.collectAsState()
-    val filterState by viewModel.filterState.collectAsState()
+    // Use a single state object for better state management
+    var uiState by remember { mutableStateOf(MapUiState()) }
 
-    // Changed loading state to use mutableState
-    var isLoading by remember { mutableStateOf(true) }
+    // Keep MapView reference separate since it's an Android View
     var mapView: MapView? by remember { mutableStateOf(null) }
-    var showFilterSheet by remember { mutableStateOf(false) }
+    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+    var markerClusterManager by remember { mutableStateOf<MarkerClusterManager?>(null) }
     val bottomSheetState = rememberModalBottomSheetState()
 
+    // Collect filter state
+    val filterState by viewModel.filterState.collectAsState()
+
+    // Setup marker icons
     val defaultMarkerIcon: Drawable? = remember {
         ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
             ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
@@ -93,31 +86,34 @@ fun MapScreen(
             ?: defaultMarkerIcon
     }
 
-    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
-
-    // Test direct JSON reading
+    // Collect sightings using LaunchedEffect to avoid doing it during composition
     LaunchedEffect(Unit) {
-        try {
-            val jsonString = context.assets.open("sightings.json").bufferedReader().use { it.readText() }
-            Log.d("MapScreen", "JSON file read success: ${jsonString.take(100)}...")
-        } catch (e: Exception) {
-            Log.e("MapScreen", "Error reading JSON: ${e.message}", e)
+        viewModel.sightings.collectLatest { sightings ->
+            uiState = uiState.copy(
+                sightings = sightings,
+                isLoading = sightings.isEmpty() && uiState.isLoading,
+                filterApplied = filterState.hasActiveFilters()
+            )
+
+            // Add timeout for loading state
+            if (uiState.isLoading) {
+                delay(5000)
+                uiState = uiState.copy(isLoading = false)
+            }
         }
     }
 
-    // Loading state management
-    LaunchedEffect(sightings) {
-        Log.d("MapScreen", "LaunchedEffect triggered. Sightings count: ${sightings.size}")
-        if (sightings.isNotEmpty()) {
-            isLoading = false
-        } else {
-            // Set a timeout in case database is truly empty
-            delay(5000)
-            isLoading = false
+    // Collect errors
+    LaunchedEffect(Unit) {
+        viewModel.error.collectLatest { errorMessage ->
+            if (errorMessage != null) {
+                uiState = uiState.copy(errorMessage = errorMessage)
+                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+            }
         }
     }
 
-    // Lifecycle handling
+    // Lifecycle handling for MapView
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -147,9 +143,9 @@ fun MapScreen(
             Column {
                 // Top app bar with filter action
                 TopAppBar(
-                    title = { Text("UFO Sighting Map") },
+                    title = { Text(stringResource(R.string.ufosightingmap)) },
                     actions = {
-                        // Analysis button - NEW!
+                        // Analysis button
                         IconButton(onClick = onShowCorrelationAnalysis) {
                             Icon(
                                 Icons.Default.Analytics,
@@ -158,7 +154,9 @@ fun MapScreen(
                         }
 
                         // Filter button
-                        IconButton(onClick = { showFilterSheet = true }) {
+                        IconButton(onClick = {
+                            uiState = uiState.copy(showFilterSheet = true)
+                        }) {
                             Icon(
                                 Icons.Default.FilterList,
                                 contentDescription = "Filter"
@@ -170,7 +168,7 @@ fun MapScreen(
                             Badge(
                                 modifier = Modifier.padding(top = 4.dp, end = 4.dp)
                             ) {
-                                Text(sightings.size.toString())
+                                Text(uiState.sightings.size.toString())
                             }
                         }
                     }
@@ -191,11 +189,9 @@ fun MapScreen(
             }
         },
         floatingActionButton = {
-            // Use a Column to contain multiple floating action buttons
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                // Correlation Analysis button - if you want it here instead
+            // Column to stack multiple FABs
+            Column(horizontalAlignment = Alignment.End) {
+                // Correlation Analysis button
                 FloatingActionButton(
                     onClick = onShowCorrelationAnalysis,
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -253,14 +249,16 @@ fun MapScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Apply padding from Scaffold correctly
+                .padding(paddingValues)
         ) {
             // Map view
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     MapView(ctx).apply {
-                        Log.d("MapScreen", "Creating MapView")
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "Creating MapView")
+                        }
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         setBuiltInZoomControls(true)
@@ -268,85 +266,73 @@ fun MapScreen(
                         controller.setCenter(USA_CENTER_GEOPOINT)
                         mapView = this
 
+                        // Setup location overlay
                         val locProvider = GpsMyLocationProvider(ctx)
                         val overlay = MyLocationNewOverlay(locProvider, this)
                         try {
                             overlay.enableMyLocation()
                         } catch (se: SecurityException) {
-                            Log.w("MapScreen", "Location permission not granted for MyLocationOverlay")
+                            Log.w(TAG, "Location permission not granted for MyLocationOverlay")
                         }
                         this.overlays.add(overlay)
                         locationOverlay = overlay
 
-                        // Add a test marker to see if markers work at all
-                        val testMarker = Marker(this).apply {
-                            position = GeoPoint(40.0, -90.0)
-                            title = "Test Marker"
-                            snippet = "This is a test marker"
-                            icon = defaultMarkerIcon
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        // Create marker cluster manager
+                        markerClusterManager = MarkerClusterManager(ctx, this).apply {
+                            setAnimation(true)
+                            setMaxClusteringZoomLevel(15.0)
                         }
-                        this.overlays.add(testMarker)
-                        Log.d("MapScreen", "Added test marker at lat=40.0, lng=-90.0")
 
-                        Log.d("MapScreen", "MapView created and initialized.")
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "MapView created and initialized.")
+                        }
                     }
                 },
                 update = { view ->
-                    Log.d("MapScreen", "Map update called with ${sightings.size} sightings")
-
-                    // Log every sighting's coordinates
-                    sightings.forEachIndexed { index, sighting ->
-                        Log.d("MapScreen", "Sighting $index: lat=${sighting.latitude}, lng=${sighting.longitude}")
-                    }
-
-                    // Log map center and zoom
-                    Log.d("MapScreen", "Map center: ${view.mapCenter}, zoom: ${view.zoomLevelDouble}")
-
-                    val markersToRemove = view.overlays.filterIsInstance<Marker>()
-                        .filter { it.relatedObject is Sighting }
-                    view.overlays.removeAll(markersToRemove)
-
-                    if (sightings.isNotEmpty()) {
-                        Log.d("MapScreen", "Creating ${sightings.size} markers")
-                        try {
-                            sightings.forEach { sighting ->
-                                val markerIcon = if (sighting.isUserSubmitted) {
-                                    userSubmittedMarkerIcon ?: defaultMarkerIcon
-                                } else {
-                                    defaultMarkerIcon
-                                }
-
-                                val marker = Marker(view).apply {
-                                    id = sighting.id.toString()
-                                    position = GeoPoint(sighting.latitude, sighting.longitude)
-                                    title = sighting.city ?: "Sighting ${sighting.id}"
-                                    snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
-                                    icon = markerIcon
-                                    setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                    relatedObject = sighting
-                                    infoWindow = SightingInfoWindow(view, onSightingClick)
-                                    setOnMarkerClickListener { m, mv ->
-                                        InfoWindow.closeAllInfoWindowsOn(mv)
-                                        m.showInfoWindow()
-                                        true
-                                    }
-                                }
-                                view.overlays.add(marker)
-                                Log.d("MapScreen", "Added marker for sighting ID ${sighting.id} at ${sighting.latitude},${sighting.longitude}")
-                            }
-                        } catch (e: Exception) {
-                            Log.e("MapScreen", "Error creating markers", e)
+                    // Only update markers if we have a valid map and new sightings data
+                    if (uiState.sightings.isNotEmpty() && markerClusterManager != null) {
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "Updating map with ${uiState.sightings.size} sightings")
                         }
-                    } else {
-                        Log.d("MapScreen", "No sightings to display markers for.")
+
+                        // Clear existing markers
+                        markerClusterManager?.clearItems()
+
+                        // Add new markers through cluster manager
+                        uiState.sightings.forEach { sighting ->
+                            val markerIcon = if (sighting.isUserSubmitted) {
+                                userSubmittedMarkerIcon ?: defaultMarkerIcon
+                            } else {
+                                defaultMarkerIcon
+                            }
+
+                            val marker = Marker(view).apply {
+                                id = sighting.id.toString()
+                                position = GeoPoint(sighting.latitude, sighting.longitude)
+                                title = sighting.city ?: "Sighting ${sighting.id}"
+                                snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
+                                icon = markerIcon
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                                relatedObject = sighting
+                                infoWindow = SightingInfoWindow(view, onSightingClick)
+                                setOnMarkerClickListener { m, mv ->
+                                    InfoWindow.closeAllInfoWindowsOn(mv)
+                                    m.showInfoWindow()
+                                    true
+                                }
+                            }
+                            markerClusterManager?.addItem(marker)
+                        }
+
+                        // Refresh map with new markers
+                        markerClusterManager?.invalidate()
+                        view.invalidate()
                     }
-                    view.invalidate()
                 }
             )
 
             // Show loading indicator
-            if (isLoading) {
+            if (uiState.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -355,7 +341,7 @@ fun MapScreen(
             }
 
             // Show empty state message when no sightings and not loading
-            if (!isLoading && sightings.isEmpty()) {
+            if (!uiState.isLoading && uiState.sightings.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -370,14 +356,35 @@ fun MapScreen(
                     )
                 }
             }
+
+            // Show error message if any
+            uiState.errorMessage?.let { error ->
+                Snackbar(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp),
+                    action = {
+                        TextButton(onClick = {
+                            uiState = uiState.copy(errorMessage = null)
+                            viewModel.clearError()
+                        }) {
+                            Text("Dismiss")
+                        }
+                    }
+                ) {
+                    Text(error)
+                }
+            }
         }
     }
 
     // Show filter bottom sheet if needed
-    if (showFilterSheet) {
+    if (uiState.showFilterSheet) {
         FilterBottomSheet(
             filterState = filterState,
-            onDismiss = { showFilterSheet = false },
+            onDismiss = {
+                uiState = uiState.copy(showFilterSheet = false)
+            },
             onApplyFilters = { shape, state, country ->
                 viewModel.updateFilters(shape = shape, state = state, country = country)
             },
