@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RoomWarnings
 import androidx.room.Transaction
 import com.ufomap.ufosightingmap.data.Sighting
 import com.ufomap.ufosightingmap.data.correlation.models.MilitaryBase
@@ -72,6 +73,7 @@ interface MilitaryBaseDao {
         ) <= :radiusKm
         ORDER BY distance
     """)
+    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
     fun getBasesNearPoint(latitude: Double, longitude: Double, radiusKm: Double): Flow<List<MilitaryBase>>
 
     /**
@@ -89,6 +91,7 @@ interface MilitaryBaseDao {
         ORDER BY distance ASC
         LIMIT 1
     """)
+    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
     suspend fun getClosestBase(latitude: Double, longitude: Double): MilitaryBase?
 
     /**

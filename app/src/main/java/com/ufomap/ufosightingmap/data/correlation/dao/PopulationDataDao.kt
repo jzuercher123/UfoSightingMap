@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RoomWarnings
 import com.ufomap.ufosightingmap.data.correlation.models.PopulationData
 import kotlinx.coroutines.flow.Flow
 
@@ -51,6 +52,7 @@ interface PopulationDataDao {
         ORDER BY distance ASC
         LIMIT 1
     """)
+    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
     suspend fun getNearestPopulationData(latitude: Double, longitude: Double, year: Int): PopulationData?
 
     // Correlation queries

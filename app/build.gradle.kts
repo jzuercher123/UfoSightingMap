@@ -103,6 +103,14 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
 
+    // Add Retrofit and networking dependencies to your app/build.gradle.kts
+
+// Retrofit and networking
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
+
     // Compose UI
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
