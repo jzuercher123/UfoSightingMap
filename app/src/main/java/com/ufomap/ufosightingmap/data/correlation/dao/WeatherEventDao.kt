@@ -7,52 +7,81 @@ import androidx.room.Query
 import androidx.room.RoomWarnings
 import androidx.room.Transaction
 import com.ufomap.ufosightingmap.data.Sighting
-import com.ufomap.ufosightingmap.data.correlation.models.MilitaryBase
+import com.ufomap.ufosightingmap.data.correlation.models.WeatherEvent
 import kotlinx.coroutines.flow.Flow
+import java.util.Date
 
 /**
- * Data Access Object for military base operations.
- * Provides methods to query the military base database and correlate with sightings.
+ * Data Access Object for weather event operations.
+ * Provides methods to query weather events and correlate with sightings.
  */
 @Dao
-interface MilitaryBaseDao {
+interface WeatherEventDao {
 
     // Basic CRUD operations
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(bases: List<MilitaryBase>)
+    suspend fun insertAll(events: List<WeatherEvent>)
 
-    @Query("SELECT * FROM military_bases")
-    fun getAllBases(): Flow<List<MilitaryBase>>
+    @Query("SELECT * FROM weather_events")
+    fun getAllWeatherEvents(): Flow<List<WeatherEvent>>
 
-    @Query("SELECT * FROM military_bases WHERE id = :baseId")
-    suspend fun getBaseById(baseId: String): MilitaryBase?
+    @Query("SELECT * FROM weather_events WHERE id = :eventId")
+    suspend fun getWeatherEventById(eventId: String): WeatherEvent?
 
-    @Query("SELECT COUNT(*) FROM military_bases")
+    @Query("SELECT COUNT(*) FROM weather_events")
     suspend fun count(): Int
 
-    @Query("DELETE FROM military_bases")
+    @Query("DELETE FROM weather_events")
     suspend fun deleteAll()
+
+    // Time-based queries
+
+    /**
+     * Get current/recent weather events
+     */
+    @Query("SELECT * FROM weather_events WHERE date >= (strftime('%s', 'now') * 1000 - 86400000) ORDER BY date DESC")
+    fun getCurrentWeatherEvents(): Flow<List<WeatherEvent>>
+
+    /**
+     * Get weather events between two dates
+     */
+    @Query("SELECT * FROM weather_events WHERE date BETWEEN :startTimestamp AND :endTimestamp ORDER BY date")
+    fun getWeatherEventsBetweenDates(startTimestamp: Long, endTimestamp: Long): Flow<List<WeatherEvent>>
+
+    /**
+     * Get the latest weather event
+     */
+    @Query("SELECT * FROM weather_events ORDER BY date DESC LIMIT 1")
+    suspend fun getLatestWeatherEvent(): WeatherEvent?
+
+    // Type-based queries
+
+    /**
+     * Get weather events by type
+     */
+    @Query("SELECT * FROM weather_events WHERE type = :type ORDER BY date DESC")
+    fun getWeatherEventsByType(type: WeatherEvent.WeatherType): Flow<List<WeatherEvent>>
+
+    /**
+     * Get unusual weather events that might correlate with UFO sightings
+     */
+    @Query("""
+        SELECT * FROM weather_events 
+        WHERE type IN (
+            'TEMPERATURE_INVERSION', 'FOG', 'SPRITES', 
+            'BALL_LIGHTNING', 'AURORA', 'THUNDERSTORM'
+        )
+        OR hasInversionLayer = 1 
+        OR hasLightRefractionConditions = 1
+        ORDER BY date DESC
+    """)
+    fun getUnusualWeatherEvents(): Flow<List<WeatherEvent>>
 
     // Geospatial queries
 
-    @Query("""
-        SELECT * FROM military_bases 
-        WHERE latitude BETWEEN :south AND :north 
-        AND longitude BETWEEN :west AND :east
-    """)
-    fun getBasesInBounds(north: Double, south: Double, east: Double, west: Double): Flow<List<MilitaryBase>>
-
-    @Query("""
-        SELECT * FROM military_bases
-        WHERE state = :state
-    """)
-    fun getBasesByState(state: String): Flow<List<MilitaryBase>>
-
-    // Correlation queries
-
     /**
-     * Find bases within a specific distance of a coordinate point
+     * Find weather events within a specific distance of a coordinate point
      * Uses Haversine formula to calculate distance
      */
     @Query("""
@@ -63,7 +92,7 @@ interface MilitaryBaseDao {
                 sin(radians(:latitude)) * sin(radians(latitude))
             )
         ) AS distance 
-        FROM military_bases
+        FROM weather_events
         WHERE (
             6371 * acos(
                 cos(radians(:latitude)) * cos(radians(latitude)) * 
@@ -74,93 +103,56 @@ interface MilitaryBaseDao {
         ORDER BY distance
     """)
     @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
-    fun getBasesNearPoint(latitude: Double, longitude: Double, radiusKm: Double): Flow<List<MilitaryBase>>
+    fun getWeatherEventsNearLocation(latitude: Double, longitude: Double, radiusKm: Double): Flow<List<WeatherEvent>>
+
+    // Correlation queries
 
     /**
-     * Find the closest military base to a given coordinate
-     */
-    @Query("""
-        SELECT *, (
-            6371 * acos(
-                cos(radians(:latitude)) * cos(radians(latitude)) * 
-                cos(radians(longitude) - radians(:longitude)) + 
-                sin(radians(:latitude)) * sin(radians(latitude))
-            )
-        ) AS distance 
-        FROM military_bases
-        ORDER BY distance ASC
-        LIMIT 1
-    """)
-    @SuppressWarnings(RoomWarnings.CURSOR_MISMATCH)
-    suspend fun getClosestBase(latitude: Double, longitude: Double): MilitaryBase?
-
-    /**
-     * Get sightings within a specified radius of any military base
-     */
-    @Transaction
-    @Query("""
-        SELECT DISTINCT sightings.*
-        FROM sightings
-        JOIN military_bases ON (
-            6371 * acos(
-                cos(radians(sightings.latitude)) * cos(radians(military_bases.latitude)) * 
-                cos(radians(military_bases.longitude) - radians(sightings.longitude)) + 
-                sin(radians(sightings.latitude)) * sin(radians(military_bases.latitude))
-            )
-        ) <= :radiusKm
-    """)
-    fun getSightingsNearAnyBase(radiusKm: Double): Flow<List<Sighting>>
-
-    /**
-     * Get distribution of sightings by distance from military bases
-     * Returns counts of sightings in distance bands (0-10km, 10-25km, 25-50km, etc.)
+     * Get distribution of sightings by weather type
      */
     @Query("""
         SELECT 
-            CASE 
-                WHEN min_distance < 10 THEN '0-10 km'
-                WHEN min_distance < 25 THEN '10-25 km'
-                WHEN min_distance < 50 THEN '25-50 km'
-                WHEN min_distance < 100 THEN '50-100 km'
-                ELSE '100+ km'
-            END AS distance_band,
-            COUNT(*) as sighting_count
-        FROM (
-            SELECT s.id, MIN(
-                6371 * acos(
-                    cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                    cos(radians(mb.longitude) - radians(s.longitude)) + 
-                    sin(radians(s.latitude)) * sin(radians(mb.latitude))
-                )
-            ) AS min_distance
-            FROM sightings s
-            CROSS JOIN military_bases mb
-            GROUP BY s.id
-        ) AS distances
-        GROUP BY distance_band
-        ORDER BY MIN(min_distance)
+            we.type as weather_type,
+            COUNT(DISTINCT s.id) as event_count
+        FROM sightings s
+        JOIN weather_events we ON 
+            abs(strftime('%s', s.dateTime) * 1000 - we.date) < 86400000 AND
+            (6371 * acos(
+                cos(radians(s.latitude)) * cos(radians(we.latitude)) * 
+                cos(radians(we.longitude) - radians(s.longitude)) + 
+                sin(radians(s.latitude)) * sin(radians(we.latitude))
+            )) <= 50
+        GROUP BY we.type
+        ORDER BY event_count DESC
     """)
-    fun getSightingCountsByDistanceBand(): Flow<List<DistanceDistribution>>
+    fun getWeatherTypeDistribution(): Flow<List<WeatherTypeDistribution>>
 
     /**
-     * Get the count of all sightings within a specific radius of any military base
+     * Get the count of all sightings that occurred during unusual weather
      */
     @Query("""
         SELECT COUNT(DISTINCT s.id)
         FROM sightings s
-        JOIN military_bases mb
-        WHERE (
-            6371 * acos(
-                cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
-                cos(radians(mb.longitude) - radians(s.longitude)) + 
-                sin(radians(s.latitude)) * sin(radians(mb.latitude))
+        WHERE EXISTS (
+            SELECT 1
+            FROM weather_events we
+            WHERE abs(strftime('%s', s.dateTime) * 1000 - we.date) < 86400000
+            AND (6371 * acos(
+                cos(radians(s.latitude)) * cos(radians(we.latitude)) * 
+                cos(radians(we.longitude) - radians(s.longitude)) + 
+                sin(radians(s.latitude)) * sin(radians(we.latitude))
+            )) <= 50
+            AND (
+                we.type IN ('TEMPERATURE_INVERSION', 'FOG', 'SPRITES', 'BALL_LIGHTNING', 'AURORA', 'THUNDERSTORM')
+                OR we.hasInversionLayer = 1 
+                OR we.hasLightRefractionConditions = 1
             )
-        ) <= :radiusKm
+        )
     """)
-    suspend fun countSightingsWithinRadius(radiusKm: Double): Int
+    suspend fun countSightingsDuringUnusualWeather(): Int
 
     /**
-     * Get the percentage of all sightings that are within a specific radius of any military base
+     * Get the percentage of all sightings that occurred during unusual weather
      */
     @Query("""
         SELECT (
@@ -169,18 +161,30 @@ interface MilitaryBaseDao {
                  FROM sightings s1
                  WHERE EXISTS (
                      SELECT 1
-                     FROM military_bases mb1
-                     WHERE (
-                         6371 * acos(
-                             cos(radians(s1.latitude)) * cos(radians(mb1.latitude)) * 
-                             cos(radians(mb1.longitude) - radians(s1.longitude)) + 
-                             sin(radians(s1.latitude)) * sin(radians(mb1.latitude))
-                         )
-                     ) <= :radiusKm
+                     FROM weather_events we1
+                     WHERE abs(strftime('%s', s1.dateTime) * 1000 - we1.date) < 86400000
+                     AND (6371 * acos(
+                         cos(radians(s1.latitude)) * cos(radians(we1.latitude)) * 
+                         cos(radians(we1.longitude) - radians(s1.longitude)) + 
+                         sin(radians(s1.latitude)) * sin(radians(we1.latitude))
+                     )) <= 50
+                     AND (
+                         we1.type IN ('TEMPERATURE_INVERSION', 'FOG', 'SPRITES', 'BALL_LIGHTNING', 'AURORA', 'THUNDERSTORM')
+                         OR we1.hasInversionLayer = 1 
+                         OR we1.hasLightRefractionConditions = 1
+                     )
                  ))
             AS FLOAT) / 
             CAST((SELECT COUNT(*) FROM sightings) AS FLOAT)
         ) * 100 
     """)
-    suspend fun getPercentageSightingsWithinRadius(radiusKm: Double): Float
+    suspend fun getPercentageSightingsDuringUnusualWeather(): Float
 }
+
+/**
+ * Data class for weather type distribution statistics
+ */
+data class WeatherTypeDistribution(
+    val weather_type: WeatherEvent.WeatherType,
+    val event_count: Int
+)

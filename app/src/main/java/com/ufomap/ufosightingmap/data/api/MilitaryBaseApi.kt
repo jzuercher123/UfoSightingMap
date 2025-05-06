@@ -1,4 +1,6 @@
 package com.ufomap.ufosightingmap.data.api
 
-class MilitaryBaseApi {
+// TODO: Define Retrofit interface for a military base data source if needed
+interface MilitaryBaseApi {
+    // Example placeholder: suspend fun getMilitaryBases(): List<SomeMilitaryBaseDto>
 }

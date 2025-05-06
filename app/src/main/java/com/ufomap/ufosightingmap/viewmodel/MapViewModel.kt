@@ -26,6 +26,14 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     private val _filterState = MutableStateFlow(FilterState())
     val filterState: StateFlow<FilterState> = _filterState.asStateFlow()
 
+    // Error state
+    private val _errorState = MutableStateFlow<String?>(null)
+    val errorState: StateFlow<String?> = _errorState.asStateFlow()
+
+    // Loading state
+    private val _isLoading = MutableStateFlow(true)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
     // Exposed sightings as StateFlow
     val sightings: StateFlow<List<Sighting>>
 
@@ -37,12 +45,6 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
 
         // Debug asset files first to check if they're accessible
         repository.debugAssetFiles()
-
-        // Force reload data instead of just checking
-        viewModelScope.launch {
-            Log.d("MapViewModel", "Forcing data reload")
-            repository.forceReloadData()
-        }
 
         // Create a flow that changes whenever the filter state changes
         @OptIn(ExperimentalCoroutinesApi::class)
@@ -60,10 +62,12 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                         searchText = filterState.searchText
                     ).onEach { list ->
                         Log.d("MapViewModel", "Filtered sightings flow emitted ${list.size} items")
+                        _isLoading.value = false
                     }
                 } else {
                     repository.allSightings.onEach { list ->
                         Log.d("MapViewModel", "All sightings flow emitted ${list.size} items")
+                        _isLoading.value = false
                     }
                 }
             }
@@ -72,8 +76,6 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
                 started = SharingStarted.WhileSubscribed(5000L),
                 initialValue = emptyList()
             )
-
-        Log.d("MapViewModel", "MapViewModel initialization complete")
     }
 
     /**
@@ -137,5 +139,36 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
     fun clearFilters() {
         Log.d("MapViewModel", "Clearing all filters")
         _filterState.value = FilterState()
+    }
+
+    /**
+     * Clear error message
+     */
+    fun clearErrorMessage() {
+        _errorState.value = null
+    }
+
+    /**
+     * Initialize database if needed
+     */
+    fun initializeDatabaseIfNeeded(scope: kotlinx.coroutines.CoroutineScope) {
+        _isLoading.value = true
+        repository.initializeDatabaseIfNeeded(scope)
+    }
+
+    /**
+     * Force reload data
+     */
+    fun forceReloadData() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                repository.forceReloadData()
+            } catch (e: Exception) {
+                _errorState.value = "Failed to reload data: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 }

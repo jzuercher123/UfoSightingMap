@@ -1,8 +1,8 @@
 [versions]
 # SDK and tools
-agp = "8.1.0"
-kotlin = "1.9.0"
-compose-compiler = "1.5.3"
+agp = "8.9.2"
+kotlin = "1.9.10" # <-- Change this from "1.9.0"
+compose-compiler = "1.5.3" # This is likely already set
 
 # AndroidX
 core-ktx = "1.12.0"
@@ -97,5 +97,5 @@ leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-and
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" } # Ensure this uses the kotlin version variable
 kotlin-kapt = { id = "org.jetbrains.kotlin.kapt", version.ref = "kotlin" }

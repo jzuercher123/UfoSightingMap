@@ -1,22 +1,47 @@
 package com.ufomap.ufosightingmap.ui
 
-import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.drawable.Drawable
 import android.util.Log
 import android.widget.Toast
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Badge
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -24,6 +49,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.ufomap.ufosightingmap.BuildConfig
 import com.ufomap.ufosightingmap.R
 import com.ufomap.ufosightingmap.data.Sighting
 import com.ufomap.ufosightingmap.utils.MarkerClusterManager
@@ -105,7 +131,7 @@ fun MapScreen(
 
     // Collect errors
     LaunchedEffect(Unit) {
-        viewModel.error.collectLatest { errorMessage ->
+        viewModel.errorState.collectLatest { errorMessage ->
             if (errorMessage != null) {
                 uiState = uiState.copy(errorMessage = errorMessage)
                 Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
@@ -143,7 +169,7 @@ fun MapScreen(
             Column {
                 // Top app bar with filter action
                 TopAppBar(
-                    title = { Text(stringResource(R.string.ufosightingmap)) },
+                    title = { Text("UFO Sighting Map") },
                     actions = {
                         // Analysis button
                         IconButton(onClick = onShowCorrelationAnalysis) {
@@ -181,11 +207,13 @@ fun MapScreen(
                 )
 
                 // Show active filters as chips if any are applied
-                ActiveFilterChips(
-                    filterState = filterState,
-                    onClearFilter = { viewModel.clearFilter(it) },
-                    onClearAll = { viewModel.clearFilters() }
-                )
+                if (filterState.hasActiveFilters()) {
+                    ActiveFilterChips(
+                        filterState = filterState,
+                        onClearFilter = { viewModel.clearFilter(it) },
+                        onClearAll = { viewModel.clearFilters() }
+                    )
+                }
             }
         },
         floatingActionButton = {
@@ -261,7 +289,8 @@ fun MapScreen(
                         }
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
-                        setBuiltInZoomControls(true)
+                        // Use property instead of deprecated method
+                        isBuiltInZoomControlsEnabled = true
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
                         mapView = this
@@ -271,8 +300,8 @@ fun MapScreen(
                         val overlay = MyLocationNewOverlay(locProvider, this)
                         try {
                             overlay.enableMyLocation()
-                        } catch (se: SecurityException) {
-                            Log.w(TAG, "Location permission not granted for MyLocationOverlay")
+                        } catch (exception: SecurityException) {
+                            Log.w(TAG, "Location permission not granted for MyLocationOverlay: ${exception.message}")
                         }
                         this.overlays.add(overlay)
                         locationOverlay = overlay
@@ -315,7 +344,7 @@ fun MapScreen(
                                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
                                 relatedObject = sighting
                                 infoWindow = SightingInfoWindow(view, onSightingClick)
-                                setOnMarkerClickListener { m, mv ->
+                                setOnMarkerClickListener { m: Marker, mv: MapView ->
                                     InfoWindow.closeAllInfoWindowsOn(mv)
                                     m.showInfoWindow()
                                     true
@@ -358,7 +387,7 @@ fun MapScreen(
             }
 
             // Show error message if any
-            uiState.errorMessage?.let { error ->
+            uiState.errorMessage?.let { errorMessage ->
                 Snackbar(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
@@ -366,13 +395,13 @@ fun MapScreen(
                     action = {
                         TextButton(onClick = {
                             uiState = uiState.copy(errorMessage = null)
-                            viewModel.clearError()
+                            viewModel.clearErrorMessage()
                         }) {
                             Text("Dismiss")
                         }
                     }
                 ) {
-                    Text(error)
+                    Text(errorMessage)
                 }
             }
         }
