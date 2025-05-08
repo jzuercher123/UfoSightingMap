@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
@@ -49,6 +50,16 @@ import com.ufomap.ufosightingmap.viewmodel.CorrelationViewModel
 import java.text.NumberFormat
 import kotlin.math.min
 import kotlin.math.roundToInt
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+
 
 /**
  * Tab for displaying military base correlation analysis.
@@ -58,11 +69,11 @@ import kotlin.math.roundToInt
 @Composable
 fun MilitaryBaseCorrelationTab(viewModel: CorrelationViewModel) {
     // State
-    val militaryBases by viewModel.militaryBases.collectAsState()
-    val sightingsWithBaseDistance by viewModel.sightingsWithBaseDistance.collectAsState()
-    val distanceDistribution by viewModel.militaryBaseDistanceDistribution.collectAsState()
-    val correlationPercentage by viewModel.militaryBaseCorrelationPercentage.collectAsState()
-    val currentRadius by viewModel.currentBaseRadiusKm.collectAsState()
+    val militaryBases by viewModel.militaryBases.collectAsState(initial = emptyList())
+    val sightingsWithBaseDistance by viewModel.sightingsWithBaseDistance.collectAsState(initial = emptyList())
+    val distanceDistribution by viewModel.militaryBaseDistanceDistribution.collectAsState(initial = emptyList())
+    val correlationPercentage by viewModel.militaryBaseCorrelationPercentage.collectAsState(initial = 0f)
+    val currentRadius by viewModel.currentBaseRadiusKm.collectAsState(initial = 50.0)
 
     // Local state for radius adjustment
     var sliderPosition by remember { mutableStateOf(currentRadius) }
@@ -98,6 +109,13 @@ fun MilitaryBaseCorrelationTab(viewModel: CorrelationViewModel) {
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Add fetch data button
+        FetchDataButton(
+            onClick = { viewModel.fetchMilitaryBaseData(true) },
+            isLoading = viewModel.isLoading.collectAsState().value,
+            baseCount = militaryBases.size
+        )
 
         // Distance distribution chart
         if (distanceDistribution.isNotEmpty()) {
@@ -304,6 +322,73 @@ private fun RadiusControl(
     }
 }
 
+@Composable
+private fun FetchDataButton(
+    onClick: () -> Unit,
+    isLoading: Boolean,
+    baseCount: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Fetch Real Military Base Data",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Load real military base data from OpenStreetMap using the Overpass API.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (baseCount > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Currently loaded: $baseCount military installations",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onClick,
+                enabled = !isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .padding(end = 8.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+                Text(if (isLoading) "Fetching..." else "Fetch Military Base Data")
+            }
+        }
+    }
+}
+
+
 /**
  * Chart showing the distribution of sightings by distance to military bases
  */
@@ -397,6 +482,10 @@ private fun BarChart(
     maxValue: Int,
     modifier: Modifier = Modifier
 ) {
+    // Extract theme colors BEFORE entering the Canvas
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val outlineColor = MaterialTheme.colorScheme.outline
+
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val canvasWidth = size.width
@@ -411,25 +500,25 @@ private fun BarChart(
                 val startX = index * (barWidth + 10f) + 10f
                 val startY = canvasHeight - barHeight
 
-                // Draw bar
+                // Draw bar - use the extracted color variable
                 drawRect(
-                    color = MaterialTheme.colorScheme.primary,
+                    color = primaryColor,
                     topLeft = Offset(startX, startY),
                     size = androidx.compose.ui.geometry.Size(barWidth, barHeight)
                 )
 
-                // Draw outline
+                // Draw outline - use the extracted color variable
                 drawRect(
-                    color = MaterialTheme.colorScheme.outline,
+                    color = outlineColor,
                     topLeft = Offset(startX, startY),
                     size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
                     style = Stroke(width = 1f)
                 )
             }
 
-            // Draw baseline
+            // Draw baseline - use the extracted color variable
             drawLine(
-                color = MaterialTheme.colorScheme.outline,
+                color = outlineColor,
                 start = Offset(0f, canvasHeight),
                 end = Offset(canvasWidth, canvasHeight),
                 strokeWidth = 2f
@@ -509,12 +598,13 @@ private fun NearestBasesSection(
             Divider()
 
             // Sightings list
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                items(sightings) { sighting ->
+                sightings.forEach { sighting ->
                     SightingNearBaseItem(sighting)
                     Divider()
                 }
@@ -526,50 +616,53 @@ private fun NearestBasesSection(
 /**
  * Individual sighting item in the list
  */
+// Replace the entire SightingNearBaseItem function (around line 410-440)
 @Composable
 private fun SightingNearBaseItem(sighting: SightingWithBaseDistance) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-    ) {
-        // Location
-        Text(
-            text = buildString {
-                append(sighting.city ?: "Unknown")
-                if (!sighting.state.isNullOrBlank()) {
-                    append(", ")
-                    append(sighting.state)
-                }
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1.5f)
-        )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        ) {
+            // Location
+            Text(
+                text = buildString {
+                    append(sighting.city ?: "Unknown")
+                    if (!sighting.state.isNullOrBlank()) {
+                        append(", ")
+                        append(sighting.state)
+                    }
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1.5f)
+            )
 
-        // Date
-        Text(
-            text = sighting.dateTime?.substringBefore("T") ?: "Unknown",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
-        )
+            // Date
+            Text(
+                text = sighting.dateTime?.substringBefore("T") ?: "Unknown",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
 
-        // Nearest Base
-        Text(
-            text = sighting.nearest_base_name ?: "Unknown",
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1.5f)
-        )
+            // Nearest Base
+            Text(
+                text = sighting.nearest_base_name ?: "Unknown",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1.5f)
+            )
 
-        // Distance
-        Text(
-            text = sighting.distance_to_nearest_base?.let {
-                String.format("%.1f km", it)
-            } ?: "Unknown",
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.End,
-            modifier = Modifier.weight(0.8f)
-        )
+            // Distance
+            Text(
+                text = sighting.distance_to_nearest_base?.let {
+                    String.format("%.1f km", it)
+                } ?: "Unknown",
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(0.8f)
+            )
+        }
     }
 }
 

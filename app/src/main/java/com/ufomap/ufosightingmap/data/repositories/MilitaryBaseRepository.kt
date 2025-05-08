@@ -1,6 +1,7 @@
 package com.ufomap.ufosightingmap.data.repositories
 
 import android.content.Context
+import com.ufomap.ufosightingmap.data.api.OverpassApi
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -29,6 +30,55 @@ class MilitaryBaseRepository(
     private val api: MilitaryBaseApi? = null
 ) {
     private val TAG = "MilitaryBaseRepository"
+    private val overpassApi = OverpassApi()
+
+    /**
+     * Fetch military base data from OpenStreetMap
+     * @param boundingBox Optional bounding box to limit search [south,west,north,east]
+     * @param replaceExisting Whether to replace existing data or append
+     */
+    suspend fun fetchMilitaryBasesFromOpenStreetMap(
+        boundingBox: String? = null,
+        replaceExisting: Boolean = false
+    ): Result<Int> {
+        return try {
+            Log.d(TAG, "Fetching military bases from OpenStreetMap")
+
+            // Fetch data from Overpass API
+            val bases = overpassApi.fetchMilitaryBases(boundingBox)
+
+            if (bases.isEmpty()) {
+                Log.w(TAG, "No military bases found from OpenStreetMap")
+                return Result.failure(Exception("No military bases found"))
+            }
+
+            Log.d(TAG, "Fetched ${bases.size} military bases from OpenStreetMap")
+
+            // Clear existing data if requested
+            if (replaceExisting) {
+                Log.d(TAG, "Clearing existing military base data")
+                militaryBaseDao.deleteAll()
+            }
+
+            // Insert the new data
+            militaryBaseDao.insertAll(bases)
+            Log.d(TAG, "Successfully stored military bases from OpenStreetMap")
+
+            Result.success(bases.size)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching military bases from OpenStreetMap: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Fetch US military bases with specific bounding box for US territory
+     */
+    suspend fun fetchUSMilitaryBases(replaceExisting: Boolean = false): Result<Int> {
+        // US mainland bounding box: roughly the continental US
+        val usBoundingBox = "24.52, -124.77, 49.38, -66.95"
+        return fetchMilitaryBasesFromOpenStreetMap(usBoundingBox, replaceExisting)
+    }
 
     // Expose all military bases as a Flow
     val allBases: Flow<List<MilitaryBase>> = militaryBaseDao.getAllBases()

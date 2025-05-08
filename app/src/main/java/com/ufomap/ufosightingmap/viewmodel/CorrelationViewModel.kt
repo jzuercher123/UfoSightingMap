@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.ufomap.ufosightingmap.data.correlation.dao.SightingWithBaseDistance
+
 import java.util.Date
 
 /**
@@ -74,6 +76,12 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
     private val _currentBaseRadiusKm = MutableStateFlow(50.0) // Default radius
     val currentBaseRadiusKm: StateFlow<Double> = _currentBaseRadiusKm.asStateFlow()
 
+    val sightingsWithBaseDistance: StateFlow<List<SightingWithBaseDistance>> = militaryBaseDao.getSightingsWithNearestBase()
+        .catch { e ->
+            Log.e(TAG, "Error sightingsWithBaseDistance flow: ${e.message}", e)
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     // Astronomical Event Correlation State
     val astronomicalEvents: StateFlow<List<AstronomicalEvent>>
     val sightingsWithAstronomicalEvents: StateFlow<List<SightingWithAstronomicalEvents>>
@@ -106,11 +114,9 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
             .catch { e -> Log.e(TAG, "Error militaryBases flow: ${e.message}"); emit(emptyList()) }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        // sightingsWithBaseDistance requires SightingWithBaseDistance type and DAO/Repo function
-        // Commented out:
-        // sightingsWithBaseDistance = militaryBaseRepository.sightingsWithBaseDistance
-        //    .catch { e -> Log.e(TAG, "Error sightingsWithBaseDistance flow: ${e.message}"); emit(emptyList()) }
-        //    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        val sightingsWithBaseDistance = militaryBaseDao.getSightingsWithNearestBase()
+            .catch { e -> Log.e(TAG, "Error sightingsWithBaseDistance flow: ${e.message}"); emit(emptyList()) }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         militaryBaseDistanceDistribution = militaryBaseRepository.sightingDistanceDistribution
             .catch { e -> Log.e(TAG, "Error militaryBaseDistanceDistribution flow: ${e.message}"); emit(emptyList()) }
@@ -153,6 +159,39 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
 
         // Initialize the databases and load initial statistics
         initializeAndLoadData()
+    }
+
+    /**
+     * Fetch military base data from OpenStreetMap
+     */
+    fun fetchMilitaryBaseData(replaceExisting: Boolean = false) {
+        _isLoading.value = true
+        _errorMessage.value = null
+
+        viewModelScope.launch {
+            try {
+                val result = militaryBaseRepository.fetchUSMilitaryBases(replaceExisting)
+
+                result.fold(
+                    onSuccess = { count ->
+                        Log.d(TAG, "Successfully fetched $count military bases")
+                        _errorMessage.value = null
+
+                        // Reload statistics
+                        loadCorrelationStatistics()
+                    },
+                    onFailure = { exception ->
+                        Log.e(TAG, "Error fetching military bases: ${exception.message}", exception)
+                        _errorMessage.value = "Failed to fetch military base data: ${exception.message}"
+                    }
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception fetching military bases: ${e.message}", e)
+                _errorMessage.value = "Exception fetching military base data: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
     }
 
     /** Initializes databases and loads initial correlation statistics. */
