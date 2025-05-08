@@ -12,6 +12,8 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
 import kotlin.math.min
+import android.view.MotionEvent
+
 
 /**
  * A simple marker clustering implementation for OSMDroid.

@@ -36,6 +36,25 @@ interface MilitaryBaseDao {
 
     // Geospatial queries
 
+    /**
+     * Get sightings with their nearest military base information
+     */
+    @Query("""
+    SELECT s.*, mb.id as nearest_base_id, mb.name as nearest_base_name, 
+    MIN(
+        6371 * acos(
+            cos(radians(s.latitude)) * cos(radians(mb.latitude)) * 
+            cos(radians(mb.longitude) - radians(s.longitude)) + 
+            sin(radians(s.latitude)) * sin(radians(mb.latitude))
+        )
+    ) as distance_to_nearest_base
+    FROM sightings s
+    CROSS JOIN military_bases mb
+    GROUP BY s.id
+    ORDER BY distance_to_nearest_base ASC
+""")
+    fun getSightingsWithNearestBase(): Flow<List<SightingWithBaseDistance>>
+
     @Query("""
         SELECT * FROM military_bases 
         WHERE latitude BETWEEN :south AND :north 
@@ -184,3 +203,4 @@ interface MilitaryBaseDao {
     """)
     suspend fun getPercentageSightingsWithinRadius(radiusKm: Double): Float
 }
+

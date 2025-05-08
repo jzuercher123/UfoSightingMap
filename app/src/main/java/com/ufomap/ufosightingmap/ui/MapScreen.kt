@@ -63,6 +63,8 @@ import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.infowindow.InfoWindow
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import androidx.compose.material3.ModalBottomSheetDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 
 // Constants for map initialization
 private const val INITIAL_ZOOM_LEVEL = 4.5
@@ -290,7 +292,7 @@ fun MapScreen(
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         // Use property instead of deprecated method
-                        isBuiltInZoomControlsEnabled = true
+                        setBuiltInZoomControls(true)
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
                         mapView = this

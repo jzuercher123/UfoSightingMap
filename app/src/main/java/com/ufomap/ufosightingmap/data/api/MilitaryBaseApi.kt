@@ -1,6 +1,13 @@
 package com.ufomap.ufosightingmap.data.api
 
-// TODO: Define Retrofit interface for a military base data source if needed
+import com.ufomap.ufosightingmap.data.correlation.models.MilitaryBase
+import retrofit2.http.GET
+
+/**
+ * API interface for fetching military base data
+ * Note: This is currently a placeholder interface as we're using local data
+ */
 interface MilitaryBaseApi {
-    // Example placeholder: suspend fun getMilitaryBases(): List<SomeMilitaryBaseDto>
+    @GET("military_bases")
+    suspend fun getMilitaryBases(): List<MilitaryBase>
 }

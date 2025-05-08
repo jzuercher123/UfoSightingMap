@@ -70,8 +70,8 @@ class SightingSubmissionViewModel(application: Application) : AndroidViewModel(a
                 )
 
                 // Save to database via repository
-                val id = repository.addUserSighting(sighting)
-                _submissionState.value = SubmissionState.Success(id.toInt())
+                val result = repository.addUserSighting(sighting)
+                val id = result.getOrNull()?.toInt() ?: -1
             } catch (e: Exception) {
                 _submissionState.value = SubmissionState.Error(e.message ?: "Unknown error")
             }

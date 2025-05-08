@@ -1,10 +1,10 @@
-package com.ufomap.ufosightingmap.data.correlation.repositories
+package com.ufomap.ufosightingmap.data.repositories
 
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.ufomap.ufosightingmap.data.correlation.api.MilitaryBaseApi
+import com.ufomap.ufosightingmap.data.api.MilitaryBaseApi
 import com.ufomap.ufosightingmap.data.correlation.dao.DistanceDistribution
 import com.ufomap.ufosightingmap.data.correlation.dao.MilitaryBaseDao
 import com.ufomap.ufosightingmap.data.correlation.dao.SightingWithBaseDistance
@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import java.io.IOException

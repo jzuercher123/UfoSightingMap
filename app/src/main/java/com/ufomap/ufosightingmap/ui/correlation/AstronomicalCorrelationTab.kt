@@ -1,5 +1,6 @@
 package com.ufomap.ufosightingmap.ui.correlation
 
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -118,6 +119,45 @@ fun AstronomicalCorrelationTab(viewModel: CorrelationViewModel) {
         ResearchSourceSection()
 
         Spacer(modifier = Modifier.height(80.dp)) // Bottom padding
+    }
+}
+
+/**
+ * Individual statistic item
+ */
+@Composable
+private fun StatisticItem(
+    title: String,
+    value: String,
+    subtitle: String? = null,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = value,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        if (subtitle != null) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
