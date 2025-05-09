@@ -194,6 +194,28 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    public fun loadFromJsonAsset() {
+        _isLoading.value = true
+        _errorMessage.value = null
+
+        viewModelScope.launch {
+            try {
+                // Force reload from JSON asset
+                militaryBaseRepository.forceReloadData()
+
+                // Reload statistics after data is loaded
+                loadCorrelationStatistics()
+
+                Log.d("MilitaryBaseCorrelationTab", "Successfully loaded military bases from local JSON asset")
+            } catch (e: Exception) {
+                Log.e("MilitaryBaseCorrelationTab", "Error loading from JSON asset: ${e.message}", e)
+                _errorMessage.value = "Failed to load from JSON asset: ${e.message}"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
     /** Initializes databases and loads initial correlation statistics. */
     private fun initializeAndLoadData() {
         Log.d(TAG, "Initializing correlation databases and loading stats")

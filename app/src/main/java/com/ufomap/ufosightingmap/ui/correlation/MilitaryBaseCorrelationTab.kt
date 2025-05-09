@@ -1,5 +1,6 @@
 package com.ufomap.ufosightingmap.ui.correlation
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,9 +22,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -47,19 +52,10 @@ import androidx.compose.ui.unit.dp
 import com.ufomap.ufosightingmap.data.correlation.dao.DistanceDistribution
 import com.ufomap.ufosightingmap.data.correlation.dao.SightingWithBaseDistance
 import com.ufomap.ufosightingmap.viewmodel.CorrelationViewModel
+import kotlinx.coroutines.launch
 import java.text.NumberFormat
 import kotlin.math.min
 import kotlin.math.roundToInt
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-
 
 /**
  * Tab for displaying military base correlation analysis.
@@ -116,6 +112,33 @@ fun MilitaryBaseCorrelationTab(viewModel: CorrelationViewModel) {
             isLoading = viewModel.isLoading.collectAsState().value,
             baseCount = militaryBases.size
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // New button with proper loading state handling
+        Button(
+            onClick = { viewModel.loadFromJsonAsset() },
+            enabled = !viewModel.isLoading.collectAsState().value,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        ) {
+            // Show circular progress indicator while loading
+            if (viewModel.isLoading.collectAsState().value) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .padding(end = 8.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+            }
+            Text(if (viewModel.isLoading.collectAsState().value) "Loading..." else "Load from Local Asset")
+        }
 
         // Distance distribution chart
         if (distanceDistribution.isNotEmpty()) {
@@ -388,7 +411,6 @@ private fun FetchDataButton(
     }
 }
 
-
 /**
  * Chart showing the distribution of sightings by distance to military bases
  */
@@ -616,7 +638,6 @@ private fun NearestBasesSection(
 /**
  * Individual sighting item in the list
  */
-// Replace the entire SightingNearBaseItem function (around line 410-440)
 @Composable
 private fun SightingNearBaseItem(sighting: SightingWithBaseDistance) {
     Box(modifier = Modifier.fillMaxWidth()) {
