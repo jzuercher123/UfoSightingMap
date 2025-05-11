@@ -1,8 +1,12 @@
 [versions]
-# SDK and tools
-agp = "8.9.2"
-kotlin = "1.9.10" # <-- Change this from "1.9.0"
-compose-compiler = "1.5.3" # This is likely already set
+# Android Gradle Plugin - update to latest stable
+agp = "8.2.2"  # or the latest stable version
+
+# Kotlin - update to latest compatible version
+kotlin = "1.9.22"  # or latest that's compatible with your Compose compiler
+
+# Compose compiler - ensure compatibility with Kotlin version
+compose-compiler = "1.5.8"  # update to match Kotlin version
 
 # AndroidX
 core-ktx = "1.12.0"
