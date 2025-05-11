@@ -153,7 +153,13 @@ class MapViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun initializeDatabaseIfNeeded(scope: kotlinx.coroutines.CoroutineScope) {
         _isLoading.value = true
+        Log.d("MapViewModel", "Loading sightings - count before: ${sightings.value.size}")
         repository.initializeDatabaseIfNeeded(scope)
+        scope.launch {
+            repository.allSightings.collect {
+                Log.d("MapViewModel", "Loading complete - count in flow: ${it.size}")
+            }
+        }
     }
 
     /**

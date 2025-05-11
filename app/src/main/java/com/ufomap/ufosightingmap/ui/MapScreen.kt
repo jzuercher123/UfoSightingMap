@@ -1,5 +1,6 @@
 package com.ufomap.ufosightingmap.ui
 
+import timber.log.Timber
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.util.Log
@@ -24,11 +25,13 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheetDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,17 +60,16 @@ import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.infowindow.InfoWindow
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import androidx.compose.material3.ModalBottomSheetDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 
 // Constants for map initialization
-private const val INITIAL_ZOOM_LEVEL = 4.5
+private const val INITIAL_ZOOM_LEVEL = 3.5
 private val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795) // Center of USA
 private const val TAG = "MapScreen"
 
@@ -117,6 +119,7 @@ fun MapScreen(
     // Collect sightings using LaunchedEffect to avoid doing it during composition
     LaunchedEffect(Unit) {
         viewModel.sightings.collectLatest { sightings ->
+            Log.d("MapScreen", "Sightings loaded: ${sightings.size}")
             uiState = uiState.copy(
                 sightings = sightings,
                 isLoading = sightings.isEmpty() && uiState.isLoading,
@@ -291,7 +294,6 @@ fun MapScreen(
                         }
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
-                        // Use property instead of deprecated method
                         setBuiltInZoomControls(true)
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
@@ -320,45 +322,7 @@ fun MapScreen(
                     }
                 },
                 update = { view ->
-                    // Only update markers if we have a valid map and new sightings data
-                    if (uiState.sightings.isNotEmpty() && markerClusterManager != null) {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "Updating map with ${uiState.sightings.size} sightings")
-                        }
-
-                        // Clear existing markers
-                        markerClusterManager?.clearItems()
-
-                        // Add new markers through cluster manager
-                        uiState.sightings.forEach { sighting ->
-                            val markerIcon = if (sighting.isUserSubmitted) {
-                                userSubmittedMarkerIcon ?: defaultMarkerIcon
-                            } else {
-                                defaultMarkerIcon
-                            }
-
-                            val marker = Marker(view).apply {
-                                id = sighting.id.toString()
-                                position = GeoPoint(sighting.latitude, sighting.longitude)
-                                title = sighting.city ?: "Sighting ${sighting.id}"
-                                snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
-                                icon = markerIcon
-                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                                relatedObject = sighting
-                                infoWindow = SightingInfoWindow(view, onSightingClick)
-                                setOnMarkerClickListener { m: Marker, mv: MapView ->
-                                    InfoWindow.closeAllInfoWindowsOn(mv)
-                                    m.showInfoWindow()
-                                    true
-                                }
-                            }
-                            markerClusterManager?.addItem(marker)
-                        }
-
-                        // Refresh map with new markers
-                        markerClusterManager?.invalidate()
-                        view.invalidate()
-                    }
+                    updateMapWithSightings(view, uiState, markerClusterManager, defaultMarkerIcon, userSubmittedMarkerIcon, onSightingClick)
                 }
             )
 
@@ -424,3 +388,106 @@ fun MapScreen(
         )
     }
 }
+
+/**
+ * Helper function to update the map with sightings markers
+ */
+private fun updateMapWithSightings(
+    view: MapView,
+    uiState: MapUiState,
+    markerClusterManager: MarkerClusterManager?,
+    defaultMarkerIcon: Drawable?,
+    userSubmittedMarkerIcon: Drawable?,
+    onSightingClick: (Int) -> Unit
+) {
+    Log.d("MapScreen", "Map update called with ${uiState.sightings.size} sightings")
+
+    // Only update markers if we have a valid map and new sightings data
+    if (uiState.sightings.isEmpty() || markerClusterManager == null) {
+        Log.w("MapScreen", "Skip updating markers: sightings empty=${uiState.sightings.isEmpty()}, clusterManager=${markerClusterManager != null}")
+        return
+    }
+
+    if (BuildConfig.DEBUG) {
+        Log.d(TAG, "Updating map with ${uiState.sightings.size} sightings")
+    }
+
+    // Clear existing markers
+    markerClusterManager.clearItems()
+
+    // Track valid markers count
+    var validMarkersCount = 0
+
+    // Add new markers through cluster manager
+    uiState.sightings.forEachIndexed { index, sighting ->
+        // Validate coordinates before creating marker
+        if (sighting.latitude == 0.0 || sighting.longitude == 0.0 ||
+            !sighting.latitude.isFinite() || !sighting.longitude.isFinite() ||
+            sighting.latitude < -90.0 || sighting.latitude > 90.0 ||
+            sighting.longitude < -180.0 || sighting.longitude > 180.0) {
+
+            Log.w("MapScreen", "Skipping invalid coordinates for sighting ${sighting.id}: ${sighting.latitude},${sighting.longitude}")
+            return@forEachIndexed
+        }
+
+        Log.d("MapScreen", "Adding marker $index at: ${sighting.latitude},${sighting.longitude}")
+
+        val markerIcon = if (sighting.isUserSubmitted) {
+            userSubmittedMarkerIcon ?: defaultMarkerIcon
+        } else {
+            defaultMarkerIcon
+        }
+
+        try {
+            val marker = Marker(view).apply {
+                id = sighting.id.toString()
+                position = GeoPoint(sighting.latitude, sighting.longitude)
+                title = sighting.city ?: "Sighting ${sighting.id}"
+                snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
+                icon = markerIcon
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                relatedObject = sighting
+                infoWindow = SightingInfoWindow(view, onSightingClick)
+                setOnMarkerClickListener { m: Marker, mv: MapView ->
+                    InfoWindow.closeAllInfoWindowsOn(mv)
+                    m.showInfoWindow()
+                    true
+                }
+            }
+            markerClusterManager.addItem(marker)
+            validMarkersCount++
+        } catch (e: Exception) {
+            Log.e("MapScreen", "Error creating marker for sighting ${sighting.id}: ${e.message}")
+        }
+    }
+
+    // Log how many valid markers were actually added
+    Log.d("MapScreen", "Added $validMarkersCount valid markers out of ${uiState.sightings.size} sightings")
+
+    // Refresh map with new markers
+    markerClusterManager.invalidate()
+    view.invalidate()
+
+    // Try to zoom to show all markers if we have any valid ones
+    if (validMarkersCount > 0) {
+        try {
+            val boundingBox = BoundingBox()
+            uiState.sightings.forEach { sighting ->
+                if (sighting.latitude.isFinite() && sighting.longitude.isFinite() &&
+                    sighting.latitude >= -90.0 && sighting.latitude <= 90.0 &&
+                    sighting.longitude >= -180.0 && sighting.longitude <= 180.0) {
+                    boundingBox.include(GeoPoint(sighting.latitude, sighting.longitude))
+                }
+            }
+
+            if (!boundingBox.isNull() && boundingBox.width > 0 && boundingBox.height > 0) {
+                view.zoomToBoundingBox(boundingBox, true, 50, 17.0, 1000L)
+
+                Log.d("MapScreen", "Zoomed to show all markers")
+            }
+        } catch (e: Exception) {
+            Log.e("MapScreen", "Error zooming to markers: ${e.message}")
+        }
+    }
+}
+
