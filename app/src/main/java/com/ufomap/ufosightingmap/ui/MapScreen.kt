@@ -3,7 +3,6 @@ package com.ufomap.ufosightingmap.ui
 import timber.log.Timber
 import android.content.Context
 import android.graphics.drawable.Drawable
-import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +24,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheetDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Text
@@ -119,7 +117,7 @@ fun MapScreen(
     // Collect sightings using LaunchedEffect to avoid doing it during composition
     LaunchedEffect(Unit) {
         viewModel.sightings.collectLatest { sightings ->
-            Log.d("MapScreen", "Sightings loaded: ${sightings.size}")
+            Timber.d("Sightings loaded: ${sightings.size}")
             uiState = uiState.copy(
                 sightings = sightings,
                 isLoading = sightings.isEmpty() && uiState.isLoading,
@@ -289,14 +287,13 @@ fun MapScreen(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     MapView(ctx).apply {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "Creating MapView")
-                        }
-                        setTileSource(TileSourceFactory.MAPNIK)
+                        // Use property assignment instead of function calls
                         setMultiTouchControls(true)
-                        setBuiltInZoomControls(true)
+                        @Suppress("DEPRECATION")
+                        setBuiltInZoomControls(true) // Note: This is deprecated
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
+                        setTileSource(TileSourceFactory.MAPNIK)
                         mapView = this
 
                         // Setup location overlay
@@ -305,7 +302,7 @@ fun MapScreen(
                         try {
                             overlay.enableMyLocation()
                         } catch (exception: SecurityException) {
-                            Log.w(TAG, "Location permission not granted for MyLocationOverlay: ${exception.message}")
+                            Timber.w("Location permission not granted for MyLocationOverlay: ${exception.message}")
                         }
                         this.overlays.add(overlay)
                         locationOverlay = overlay
@@ -317,7 +314,7 @@ fun MapScreen(
                         }
 
                         if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "MapView created and initialized.")
+                            Timber.d("MapView created and initialized.")
                         }
                     }
                 },
@@ -400,16 +397,29 @@ private fun updateMapWithSightings(
     userSubmittedMarkerIcon: Drawable?,
     onSightingClick: (Int) -> Unit
 ) {
-    Log.d("MapScreen", "Map update called with ${uiState.sightings.size} sightings")
+    try {
+        val testMarker = Marker(view).apply {
+            position = GeoPoint(39.8283, -98.5795) // Center of USA
+            title = "Test Marker"
+            snippet = "This is a test"
+            icon = defaultMarkerIcon
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        }
+        markerClusterManager?.addItem(testMarker)
+        Timber.d("Added test marker to map")
+    } catch (e: Exception) {
+        Timber.e(e, "Error adding test marker")
+    }
+    Timber.d("Map update called with ${uiState.sightings.size} sightings")
 
     // Only update markers if we have a valid map and new sightings data
     if (uiState.sightings.isEmpty() || markerClusterManager == null) {
-        Log.w("MapScreen", "Skip updating markers: sightings empty=${uiState.sightings.isEmpty()}, clusterManager=${markerClusterManager != null}")
+        Timber.w("Skip updating markers: sightings empty=${uiState.sightings.isEmpty()}, clusterManager=${markerClusterManager != null}")
         return
     }
 
     if (BuildConfig.DEBUG) {
-        Log.d(TAG, "Updating map with ${uiState.sightings.size} sightings")
+        Timber.d("Updating map with ${uiState.sightings.size} sightings")
     }
 
     // Clear existing markers
@@ -426,11 +436,11 @@ private fun updateMapWithSightings(
             sighting.latitude < -90.0 || sighting.latitude > 90.0 ||
             sighting.longitude < -180.0 || sighting.longitude > 180.0) {
 
-            Log.w("MapScreen", "Skipping invalid coordinates for sighting ${sighting.id}: ${sighting.latitude},${sighting.longitude}")
+            Timber.w("Skipping invalid coordinates for sighting ${sighting.id}: ${sighting.latitude},${sighting.longitude}")
             return@forEachIndexed
         }
 
-        Log.d("MapScreen", "Adding marker $index at: ${sighting.latitude},${sighting.longitude}")
+        Timber.d("Adding marker $index at: ${sighting.latitude},${sighting.longitude}")
 
         val markerIcon = if (sighting.isUserSubmitted) {
             userSubmittedMarkerIcon ?: defaultMarkerIcon
@@ -457,12 +467,12 @@ private fun updateMapWithSightings(
             markerClusterManager.addItem(marker)
             validMarkersCount++
         } catch (e: Exception) {
-            Log.e("MapScreen", "Error creating marker for sighting ${sighting.id}: ${e.message}")
+            Timber.e(e, "Error creating marker for sighting ${sighting.id}")
         }
     }
 
     // Log how many valid markers were actually added
-    Log.d("MapScreen", "Added $validMarkersCount valid markers out of ${uiState.sightings.size} sightings")
+    Timber.d("Added $validMarkersCount valid markers out of ${uiState.sightings.size} sightings")
 
     // Refresh map with new markers
     markerClusterManager.invalidate()
@@ -471,23 +481,53 @@ private fun updateMapWithSightings(
     // Try to zoom to show all markers if we have any valid ones
     if (validMarkersCount > 0) {
         try {
-            val boundingBox = BoundingBox()
+            // Track min/max coordinates to build bounding box
+            var minLat = 90.0
+            var maxLat = -90.0
+            var minLon = 180.0
+            var maxLon = -180.0
+            var hasValidPoints = false
+
+            // Find the bounds of all valid markers
             uiState.sightings.forEach { sighting ->
                 if (sighting.latitude.isFinite() && sighting.longitude.isFinite() &&
                     sighting.latitude >= -90.0 && sighting.latitude <= 90.0 &&
                     sighting.longitude >= -180.0 && sighting.longitude <= 180.0) {
-                    boundingBox.include(GeoPoint(sighting.latitude, sighting.longitude))
+
+                    // Update min/max coordinates
+                    minLat = minOf(minLat, sighting.latitude)
+                    maxLat = maxOf(maxLat, sighting.latitude)
+                    minLon = minOf(minLon, sighting.longitude)
+                    maxLon = maxOf(maxLon, sighting.longitude)
+                    hasValidPoints = true
                 }
             }
 
-            if (!boundingBox.isNull() && boundingBox.width > 0 && boundingBox.height > 0) {
-                view.zoomToBoundingBox(boundingBox, true, 50, 17.0, 1000L)
+            // If we found valid points, create a bounding box
+            if (hasValidPoints) {
+                // Ensure minimum span size to avoid errors
+                val minSpan = 0.1 // degrees
 
-                Log.d("MapScreen", "Zoomed to show all markers")
+                // If bounding box is too small in any dimension, expand it
+                if (maxLat - minLat < minSpan) {
+                    val mid = (maxLat + minLat) / 2
+                    maxLat = mid + minSpan / 2
+                    minLat = mid - minSpan / 2
+                }
+
+                if (maxLon - minLon < minSpan) {
+                    val mid = (maxLon + minLon) / 2
+                    maxLon = mid + minSpan / 2
+                    minLon = mid - minSpan / 2
+                }
+
+                // Create the bounding box and zoom to it
+                val boundingBox = BoundingBox(maxLat, maxLon, minLat, minLon)
+                view.zoomToBoundingBox(boundingBox, true, 50, 17.0, 1000L)
+                Timber.d("Zoomed to show all markers")
             }
         } catch (e: Exception) {
-            Log.e("MapScreen", "Error zooming to markers: ${e.message}")
+            Timber.e(e, "Error zooming to markers: ${e.message}")
         }
     }
 }
-
