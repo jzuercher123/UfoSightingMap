@@ -50,13 +50,6 @@ class MarkerClusterManager(
     }
 
     /**
-     * Add multiple markers
-     */
-    fun addItems(items: Collection<Marker>) {
-        markers.addAll(items)
-    }
-
-    /**
      * Remove all managed markers
      */
     fun clearItems() {
@@ -314,6 +307,21 @@ class MarkerClusterManager(
             mapView.controller.zoomIn()
         }
     }
+
+    fun addItems(items: Collection<Marker>) {
+        markers.addAll(items)
+    }
+
+    // Add method to remove individual markers
+    fun removeItem(marker: Marker): Boolean {
+        val removed = markers.remove(marker)
+        if (removed) {
+            // Force re-clustering if a marker was removed
+            invalidate()
+        }
+        return removed
+    }
+
 
     /**
      * Create a bitmap drawable for cluster markers

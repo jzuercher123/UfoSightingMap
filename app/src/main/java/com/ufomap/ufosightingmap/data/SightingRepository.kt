@@ -113,6 +113,7 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     /**
      * Debug function to check if we can access asset files
      */
+    // In SightingRepository.kt
     fun debugAssetFiles() {
         try {
             val files = context.assets.list("")
@@ -127,6 +128,12 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
                     it.readText().take(100)
                 }
                 Log.d(TAG, "JSON starts with: $start...")
+
+                // Check Room database state
+                viewModelScope.launch(Dispatchers.IO) {
+                    val count = sightingDao.count()
+                    Log.d(TAG, "Current database contains $count sightings")
+                }
             } else {
                 Log.e(TAG, "sightings.json NOT FOUND in assets")
                 _error.value = "sightings.json not found in assets"
@@ -136,6 +143,15 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
             _error.value = "Failed to check asset files: ${e.message}"
         }
     }
+
+    /**
+     * Gets a raw count of sightings in the database.
+     * Unlike flow-based methods, this returns a direct count for immediate use.
+     */
+    suspend fun getRawCount(): Int {
+        return sightingDao.count()
+    }
+
 
     /**
      * Load sightings from the JSON asset file and insert them into the database.
