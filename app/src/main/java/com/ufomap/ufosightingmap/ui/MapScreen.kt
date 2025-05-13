@@ -1,16 +1,24 @@
 package com.ufomap.ufosightingmap.ui
 
+import timber.log.Timber
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+// import androidx.compose.foundation.layout.Row // Not used directly, can be removed if not needed elsewhere
+// import androidx.compose.foundation.layout.Spacer // Not used directly
 import androidx.compose.foundation.layout.fillMaxSize
+// import androidx.compose.foundation.layout.fillMaxWidth // Not used directly
+// import androidx.compose.foundation.layout.height // Not used directly
 import androidx.compose.foundation.layout.padding
+// import androidx.compose.foundation.layout.width // Not used directly
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Refresh // ADDED IMPORT
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -18,8 +26,10 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+// import androidx.compose.material3.ModalBottomSheetDefaults // Not used directly
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost // For Snackbar display
+import androidx.compose.material3.SnackbarHostState // For Snackbar display
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -44,6 +54,7 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.ufomap.ufosightingmap.BuildConfig
 import com.ufomap.ufosightingmap.R
 import com.ufomap.ufosightingmap.data.Sighting
 import com.ufomap.ufosightingmap.utils.MarkerClusterManager
@@ -55,39 +66,25 @@ import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.infowindow.InfoWindow
+import org.osmdroid.views.overlay.infowindow.InfoWindow // Keep this for custom info window logic
+// import org.osmdroid.views.overlay.infowindow.BasicInfoWindow // If SightingInfoWindow is not used
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
-import timber.log.Timber
 
 // Constants for map initialization
 private const val INITIAL_ZOOM_LEVEL = 3.5
 private val USA_CENTER_GEOPOINT = GeoPoint(39.8283, -98.5795) // Center of USA
 private const val TAG = "MapScreen"
-private const val MIN_BOUNDING_BOX_SPAN_DEGREES = 0.1
-private const val LOADING_TIMEOUT_MS = 5000L
-private const val MAX_ZOOM_LEVEL = 17.0
 
-/**
- * Represents the current UI state of the map screen.
- * Using a single state object makes it easier to manage complex state changes.
- */
+// Define UI states for better state management
 data class MapUiState(
     val isLoading: Boolean = true,
     val showFilterSheet: Boolean = false,
-    val filterApplied: Boolean = false,
+    // val filterApplied: Boolean = false, // This can be derived from filterState directly
     val sightings: List<Sighting> = emptyList(),
     val errorMessage: String? = null
 )
 
-/**
- * Main map screen that displays UFO sightings on a map with filtering capabilities.
- *
- * @param viewModel ViewModel that provides data and handles business logic
- * @param onSightingClick Callback when a sighting is clicked for details
- * @param onReportSighting Callback when user wants to report a new sighting
- * @param onShowCorrelationAnalysis Callback when user wants to view correlation analysis
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
@@ -99,132 +96,134 @@ fun MapScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // State management
     var uiState by remember { mutableStateOf(MapUiState()) }
-    val filterState by viewModel.filterState.collectAsState()
-    val bottomSheetState = rememberModalBottomSheetState()
+    val snackbarHostState = remember { SnackbarHostState() } // For Snackbar
 
-    // Map-related state
     var mapView: MapView? by remember { mutableStateOf(null) }
     var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
     var markerClusterManager by remember { mutableStateOf<MarkerClusterManager?>(null) }
+    val bottomSheetState = rememberModalBottomSheetState()
 
-    // Setup marker icons
-    val markerIcons: Drawable? = remember {
-        ContextCompat.getDrawable(context, R.drawable.ic_ufo_marker)
-            ?: ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
-            ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
+    val filterState by viewModel.filterState.collectAsState()
+    val isLoadingFromViewModel by viewModel.isLoading.collectAsState() // Collect ViewModel's loading state
+
+    val defaultMarkerIcon: Drawable? = remember(context) { // Ensure context is a key for remember
+        ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
+            ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map) // Fallback
     }
 
-    // Collect sightings
-    LaunchedEffect(Unit) {
-        viewModel.sightings.collectLatest { sightings ->
-            Timber.d("Received ${sightings.size} sightings")
+    val userSubmittedMarkerIcon: Drawable? = remember(context, defaultMarkerIcon) {
+        ContextCompat.getDrawable(context, R.drawable.ic_marker_user_submitted)
+            ?: defaultMarkerIcon // Fallback to default
+    }
 
+    LaunchedEffect(isLoadingFromViewModel, viewModel.sightings) {
+        viewModel.sightings.collectLatest { sightings ->
+            Timber.tag(TAG).d("Sightings loaded: ${sightings.size}")
             uiState = uiState.copy(
                 sightings = sightings,
-                isLoading = sightings.isEmpty() && uiState.isLoading,
-                filterApplied = filterState.hasActiveFilters()
+                // isLoading should primarily be driven by the ViewModel's state
+                // isLoading = isLoadingFromViewModel && sightings.isEmpty() // More robust loading
+                isLoading = isLoadingFromViewModel
             )
 
-            // Add timeout for loading state to avoid waiting forever
-            if (uiState.isLoading) {
-                delay(LOADING_TIMEOUT_MS)
+            // If ViewModel indicates loading is done, but we were still showing loading locally, stop.
+            if (!isLoadingFromViewModel && uiState.isLoading) {
                 uiState = uiState.copy(isLoading = false)
             }
         }
     }
+    LaunchedEffect(Unit) {
+        // Initial load trigger if needed, or rely on ViewModel's init
+        // viewModel.loadInitialData() // Example if you have such a method
+    }
 
-    // Collect errors
+
     LaunchedEffect(Unit) {
         viewModel.errorState.collectLatest { errorMessage ->
             if (errorMessage != null) {
-                uiState = uiState.copy(errorMessage = errorMessage)
-                Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
+                Timber.tag(TAG).e("Error received: $errorMessage")
+                snackbarHostState.showSnackbar(
+                    message = errorMessage,
+                    actionLabel = "Dismiss"
+                )
+                viewModel.clearErrorMessage() // Clear error in VM after showing
             }
         }
     }
 
-    // Lifecycle handling for MapView
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> mapView?.onResume()
                 Lifecycle.Event.ON_PAUSE -> mapView?.onPause()
                 Lifecycle.Event.ON_DESTROY -> {
+                    Timber.tag(TAG).d("MapScreen ON_DESTROY: Detaching MapView and disabling location.")
                     locationOverlay?.disableMyLocation()
-                    mapView?.onDetach()
+                    mapView?.onDetach() // Ensures map resources are released
+                    mapView = null // Help GC
+                    locationOverlay = null
+                    markerClusterManager = null
                 }
                 else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            Timber.tag(TAG).d("MapScreen onDispose: Removing observer.")
             lifecycleOwner.lifecycle.removeObserver(observer)
-            if (lifecycleOwner.lifecycle.currentState == Lifecycle.State.DESTROYED) {
-                locationOverlay?.disableMyLocation()
-                mapView?.onDetach()
-            } else {
+            // Ensure cleanup even if not fully destroyed, e.g., config change
+            if (lifecycleOwner.lifecycle.currentState != Lifecycle.State.DESTROYED) {
                 mapView?.onPause()
             }
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) }, // Add SnackbarHost
         topBar = {
             Column {
-                // Top app bar with filter action
                 TopAppBar(
                     title = { Text("UFO Sighting Map") },
                     actions = {
-                        // Analysis button
+                        IconButton(onClick = {
+                            Timber.tag(TAG).d("Refresh button clicked")
+                            viewModel.refreshData() // Assuming you have a refresh method
+                        }) {
+                            Icon(
+                                Icons.Filled.Refresh, // CORRECTED ICON
+                                contentDescription = "Refresh Data"
+                            )
+                        }
                         IconButton(onClick = onShowCorrelationAnalysis) {
                             Icon(
                                 Icons.Default.Analytics,
                                 contentDescription = "Correlation Analysis"
                             )
                         }
-
-                        // Add to MapScreen.kt toolbar actions
-                        IconButton(
-                            onClick = { viewModel.forceReloadData() }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Reload Data"
-                            )
-                        }
-
-                        // Filter button
-                        IconButton(onClick = {
-                            uiState = uiState.copy(showFilterSheet = true)
-                        }) {
-                            Icon(
-                                Icons.Default.FilterList,
-                                contentDescription = "Filter"
-                            )
-                        }
-
-
-
-                        // Badge showing filtered count if filters applied
-                        if (filterState.hasActiveFilters()) {
-                            Badge(
-                                modifier = Modifier.padding(top = 4.dp, end = 4.dp)
-                            ) {
-                                Text(uiState.sightings.size.toString())
+                        Box { // Wrap IconButton and Badge in a Box for proper badge placement
+                            IconButton(onClick = {
+                                uiState = uiState.copy(showFilterSheet = true)
+                            }) {
+                                Icon(
+                                    Icons.Default.FilterList,
+                                    contentDescription = "Filter"
+                                )
+                            }
+                            if (filterState.hasActiveFilters()) {
+                                Badge(
+                                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)
+                                ) {
+                                    Text(uiState.sightings.size.toString())
+                                }
                             }
                         }
                     }
                 )
-
-                // Add search bar
                 SearchBar(
                     initialQuery = filterState.searchText ?: "",
                     onQueryChanged = { viewModel.updateSearchQuery(it) }
                 )
-
-                // Show active filters as chips if any are applied
                 if (filterState.hasActiveFilters()) {
                     ActiveFilterChips(
                         filterState = filterState,
@@ -235,57 +234,124 @@ fun MapScreen(
             }
         },
         floatingActionButton = {
-            // Action buttons
-            ActionButtons(
-                onAnalyzeClick = onShowCorrelationAnalysis,
-                onMyLocationClick = {
-                    handleMyLocationRequest(locationOverlay, mapView, context)
-                },
-                onReportClick = onReportSighting
-            )
+            Column(horizontalAlignment = Alignment.End) {
+                FloatingActionButton(
+                    onClick = {
+                        locationOverlay?.let { overlay ->
+                            if (overlay.myLocation != null) {
+                                mapView?.controller?.animateTo(overlay.myLocation)
+                                mapView?.controller?.setZoom(15.0)
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    "Location not available. Make sure location is enabled.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier.padding(vertical = 8.dp),
+                ) {
+                    Icon(
+                        painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
+                        contentDescription = "My Location"
+                    )
+                }
+                FloatingActionButton(
+                    onClick = onReportSighting,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Report Sighting"
+                    )
+                }
+            }
         }
     ) { paddingValues ->
-        // Main content area (Map and overlays)
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Map view
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
-                    createMapView(ctx, { newMapView ->
-                        mapView = newMapView
-                    }, { newLocationOverlay ->
+                    MapView(ctx).apply {
+                        Timber.tag(TAG).d("MapView factory invoked.")
+                        setTileSource(TileSourceFactory.MAPNIK)
+                        setMultiTouchControls(true)
+                        // controller.setZoomButtonVisibility(MapView.ZoomButtonVisibility.SHOW_AND_FADEOUT) // Old way
+                        setBuiltInZoomControls(true) // CORRECTED for controlling zoom buttons
+                        displayZoomControls(false) // Optionally hide them if using custom controls or gestures primarily
+
+                        controller.setZoom(INITIAL_ZOOM_LEVEL)
+                        controller.setCenter(USA_CENTER_GEOPOINT)
+
+                        val locProvider = GpsMyLocationProvider(ctx)
+                        val newLocationOverlay = MyLocationNewOverlay(locProvider, this)
+                        try {
+                            newLocationOverlay.enableMyLocation()
+                        } catch (e: SecurityException) {
+                            Timber.tag(TAG).w(e, "Location permission not granted for MyLocationOverlay.")
+                        }
+                        overlays.add(newLocationOverlay)
                         locationOverlay = newLocationOverlay
-                    }, { newClusterManager ->
-                        markerClusterManager = newClusterManager
-                    })
+
+                        markerClusterManager = MarkerClusterManager(ctx, this).apply {
+                            setAnimation(true)
+                            setMaxClusteringZoomLevel(15.0) // Example, adjust as needed
+                        }
+                        mapView = this // Assign to the state variable
+                        Timber.tag(TAG).d("MapView created and initialized in factory.")
+                    }
                 },
                 update = { view ->
+                    Timber.tag(TAG).d("MapView update called with ${uiState.sightings.size} sightings.")
+                    // The error "Argument type mismatch: actual type is 'android.graphics.drawable.Drawable?',
+                    // but 'kotlin.collections.Map<kotlin.String, android.graphics.drawable.Drawable?>' was expected."
+                    // is very strange if it points to this call, as the function signature matches.
+                    // Ensuring the passed drawables are indeed Drawable? and not something else.
                     updateMapWithSightings(
                         view,
-                        uiState.sightings,
+                        uiState,
                         markerClusterManager,
-                        markerIcons,
+                        defaultMarkerIcon,
+                        userSubmittedMarkerIcon,
                         onSightingClick
                     )
                 }
             )
 
-            // Overlays - loading indicator, empty state, error message
-            RenderOverlays(
-                uiState = uiState,
-                onDismissError = {
-                    uiState = uiState.copy(errorMessage = null)
-                    viewModel.clearErrorMessage()
+            if (uiState.isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .align(Alignment.Center) // CORRECTED Modifier usage
+                        .zIndex(1f)
+                )
+            }
+
+            if (!uiState.isLoading && uiState.sightings.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                        .zIndex(1f), // Ensure it's on top of the map if map is rendered
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No sightings found. Try adjusting filters or refreshing.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        textAlign = TextAlign.Center,
+                        // include = false, // This was the error: 'include'
+                        includeFontPadding = false // CORRECTED: 'includeFontPadding'
+                    )
                 }
-            )
+            }
+            // Error Snackbar is handled by Scaffold's snackbarHost
         }
     }
 
-    // Show filter bottom sheet if needed
     if (uiState.showFilterSheet) {
         FilterBottomSheet(
             filterState = filterState,
@@ -294,345 +360,100 @@ fun MapScreen(
             },
             onApplyFilters = { shape, state, country ->
                 viewModel.updateFilters(shape = shape, state = state, country = country)
+                uiState = uiState.copy(showFilterSheet = false) // Dismiss after applying
             },
-            onClearFilters = { viewModel.clearFilters() },
+            onClearFilters = {
+                viewModel.clearFilters()
+                // uiState = uiState.copy(showFilterSheet = false) // Optionally dismiss
+            },
             sheetState = bottomSheetState
         )
     }
 }
 
-
-
-/**
- * Creates and configures the MapView.
- */
-private fun createMapView(
-    context: Context,
-    onMapViewCreated: (MapView) -> Unit,
-    onLocationOverlayCreated: (MyLocationNewOverlay) -> Unit,
-    onClusterManagerCreated: (MarkerClusterManager) -> Unit
-): MapView {
-    return MapView(context).apply {
-        Timber.d("Creating and configuring MapView")
-
-        // Configure map
-        setTileSource(TileSourceFactory.MAPNIK)
-        setMultiTouchControls(true)
-
-        // Use modern zoom controls instead of deprecated built-in ones
-        setZoomButtonVisibility(false)
-
-        // Set initial position
-        controller.setZoom(INITIAL_ZOOM_LEVEL)
-        controller.setCenter(USA_CENTER_GEOPOINT)
-
-        // Set up location overlay
-        val locationProvider = GpsMyLocationProvider(context)
-        val myLocationOverlay = MyLocationNewOverlay(locationProvider, this).apply {
-            try {
-                enableMyLocation()
-                Timber.d("Location overlay enabled")
-            } catch (e: SecurityException) {
-                Timber.w("Location permission not granted: ${e.message}")
-            }
-        }
-        overlays.add(myLocationOverlay)
-        onLocationOverlayCreated(myLocationOverlay)
-
-        // Create marker cluster manager
-        val clusterManager = MarkerClusterManager(context, this).apply {
-            setAnimation(true)
-            setMaxClusteringZoomLevel(MAX_ZOOM_LEVEL)
-        }
-        onClusterManagerCreated(clusterManager)
-
-        // Provide the created MapView back to the caller
-        onMapViewCreated(this)
-
-        Timber.d("MapView configuration complete")
-    }
-}
-
-/**
- * Loads marker icons from resources.
- */
-private fun loadMarkerIcons(context: Context): Map<String, Drawable?> {
-    val defaultIcon = ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
-        ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
-
-    val userSubmittedIcon = ContextCompat.getDrawable(context, R.drawable.ic_marker_user_submitted)
-        ?: defaultIcon
-
-    return mapOf(
-        "default" to defaultIcon,
-        "user_submitted" to userSubmittedIcon
-    )
-}
-
-/**
- * Handles the "My Location" button click.
- */
-private fun handleMyLocationRequest(
-    locationOverlay: MyLocationNewOverlay?,
-    mapView: MapView?,
-    context: Context
-) {
-    locationOverlay?.let { overlay ->
-        if (overlay.myLocation != null) {
-            mapView?.controller?.animateTo(overlay.myLocation)
-            mapView?.controller?.setZoom(15.0)
-        } else {
-            Toast.makeText(
-                context,
-                "Location not available. Make sure location is enabled.",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-}
-
-/**
- * Renders the floating action buttons.
- */
-@Composable
-private fun ActionButtons(
-    onAnalyzeClick: () -> Unit,
-    onMyLocationClick: () -> Unit,
-    onReportClick: () -> Unit
-) {
-    Column(horizontalAlignment = Alignment.End) {
-        // Correlation Analysis button
-        FloatingActionButton(
-            onClick = onAnalyzeClick,
-            modifier = Modifier.padding(vertical = 8.dp),
-            containerColor = MaterialTheme.colorScheme.tertiary,
-            contentColor = MaterialTheme.colorScheme.onTertiary
-        ) {
-            Icon(
-                imageVector = Icons.Default.Analytics,
-                contentDescription = "Analyze Data"
-            )
-        }
-
-        // My Location button
-        FloatingActionButton(
-            onClick = onMyLocationClick,
-            modifier = Modifier.padding(vertical = 8.dp),
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
-        ) {
-            Icon(
-                painter = painterResource(id = android.R.drawable.ic_menu_mylocation),
-                contentDescription = "My Location"
-            )
-        }
-
-        // Report Sighting button
-        FloatingActionButton(
-            onClick = onReportClick,
-            modifier = Modifier.padding(vertical = 8.dp),
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = "Report Sighting"
-            )
-        }
-    }
-}
-
-/**
- * Renders overlay UI elements on top of the map.
- */
-@Composable
-private fun RenderOverlays(
-    uiState: MapUiState,
-    onDismissError: () -> Unit
-) {
-    // Show loading indicator
-    if (uiState.isLoading) {
-        CircularProgressIndicator(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .zIndex(1f)
-        )
-    }
-
-    // Show empty state message when no sightings and not loading
-    if (!uiState.isLoading && uiState.sightings.isEmpty()) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-                .zIndex(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "No sightings found. Try adjusting filters or reload the app.",
-                style = MaterialTheme.typography.bodyLarge,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-
-    // Show error message if any
-    uiState.errorMessage?.let { errorMessage ->
-        Snackbar(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp),
-            action = {
-                TextButton(onClick = onDismissError) {
-                    Text("Dismiss")
-                }
-            }
-        ) {
-            Text(errorMessage)
-        }
-    }
-}
-
-/**
- * Updates the map with sighting markers.
- * This function clears existing markers and adds new ones based on the provided sightings.
- */
 private fun updateMapWithSightings(
     view: MapView,
-    sightings: List<Sighting>,
-    markerClusterManager: MarkerClusterManager?,
-    markerIcons: Map<String, Drawable?>,
+    uiState: MapUiState,
+    markerClusterMgr: MarkerClusterManager?, // Renamed for clarity
+    defaultIcon: Drawable?, // Renamed for clarity
+    userSubmittedIcon: Drawable?, // Renamed for clarity
     onSightingClick: (Int) -> Unit
 ) {
-    // Early exit if no data or cluster manager
-    if (sightings.isEmpty() || markerClusterManager == null) {
-        Timber.w("Cannot update markers: sightings empty=${sightings.isEmpty()}, clusterManager=${markerClusterManager != null}")
+    val clusterManager = markerClusterMgr ?: run {
+        Timber.tag(TAG).w("MarkerClusterManager is null in updateMapWithSightings. Skipping update.")
         return
     }
 
-    Timber.d("Updating map with ${sightings.size} sightings")
+    Timber.tag(TAG).d("Updating map. Sightings count: ${uiState.sightings.size}")
+    clusterManager.clearItems() // Clear previous markers
 
-    // Clear existing markers
-    markerClusterManager.clearItems()
-
-    // Track valid markers for statistics
     var validMarkersCount = 0
+    uiState.sightings.forEach { sighting ->
+        if (sighting.latitude.isFinite() && sighting.longitude.isFinite() &&
+            sighting.latitude >= -90.0 && sighting.latitude <= 90.0 &&
+            sighting.longitude >= -180.0 && sighting.longitude <= 180.0) {
 
-    // Track bounds for zooming
-    val boundingBox = BoundingBox()
+            val marker = Marker(view).apply {
+                id = sighting.id.toString() // Ensure ID is unique if possible
+                position = GeoPoint(sighting.latitude, sighting.longitude)
+                title = sighting.city ?: "Sighting #${sighting.id}"
+                snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
+                icon = if (sighting.isUserSubmitted) userSubmittedIcon ?: defaultIcon else defaultIcon
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                relatedObject = sighting // Attach the Sighting object for later use
 
-    // Add markers for all valid sightings
-    sightings.forEach { sighting ->
-        // Skip invalid coordinates
-        if (!isValidCoordinate(sighting.latitude, sighting.longitude)) {
-            Timber.w("Invalid coordinates for sighting ${sighting.id}: ${sighting.latitude},${sighting.longitude}")
-            return@forEach
-        }
-
-        // Select appropriate icon
-        val markerIcon = if (sighting.isUserSubmitted) {
-            markerIcons["user_submitted"]
-        } else {
-            markerIcons["default"]
-        }
-
-        try {
-            // Create the marker
-            val marker = createSightingMarker(
-                view,
-                sighting,
-                markerIcon,
-                onSightingClick
-            )
-
-            // Add to cluster manager
-            markerClusterManager.addItem(marker)
+                // Setup custom info window
+                infoWindow = SightingInfoWindow(view, onSightingClick)
+                // It's common to show info window on click
+                setOnMarkerClickListener { m, mv ->
+                    // Close other info windows before opening a new one
+                    InfoWindow.closeAllInfoWindowsOn(mv)
+                    if (m.isInfoWindowShown) {
+                        m.closeInfoWindow()
+                    } else {
+                        m.showInfoWindow()
+                    }
+                    mv.controller.animateTo(m.position) // Center map on marker
+                    true // Event consumed
+                }
+            }
+            clusterManager.addItem(marker)
             validMarkersCount++
-
-            // Add to bounding box
-            boundingBox.include(GeoPoint(sighting.latitude, sighting.longitude))
-        } catch (e: Exception) {
-            Timber.e(e, "Error creating marker for sighting ${sighting.id}")
+        } else {
+            Timber.tag(TAG).w("Skipping sighting with invalid coordinates: ID ${sighting.id} at ${sighting.latitude}, ${sighting.longitude}")
         }
     }
+    Timber.tag(TAG).d("Added $validMarkersCount valid markers to cluster manager.")
+    clusterManager.invalidate() // Re-cluster and draw
+    view.invalidate() // Redraw the map view itself
 
-    // Log statistics
-    Timber.d("Added $validMarkersCount valid markers out of ${sightings.size} sightings")
-
-    // Refresh map with new markers
-    markerClusterManager.invalidate()
-    view.invalidate()
-
-    // Zoom to show all markers if we have any
-    if (validMarkersCount > 0 && !boundingBox.isNull()) {
-        try {
-            // Ensure the bounding box has minimum dimensions
-            ensureMinimumBoundingBoxSize(boundingBox)
-
-            // Animate to the bounding box
-            view.zoomToBoundingBox(boundingBox, true, 50, MAX_ZOOM_LEVEL, 1000L)
-            Timber.d("Zoomed to show all markers")
-        } catch (e: Exception) {
-            Timber.e(e, "Error zooming to markers: ${e.message}")
+    // Auto-zoom logic (optional, can be resource-intensive with many markers)
+    if (validMarkersCount > 0 && uiState.sightings.isNotEmpty()) {
+        val boundingBox = BoundingBox()
+        var pointsIncluded = 0
+        uiState.sightings.forEach {
+            if (it.latitude.isFinite() && it.longitude.isFinite() &&
+                it.latitude >= -90.0 && it.latitude <= 90.0 &&
+                it.longitude >= -180.0 && it.longitude <= 180.0) {
+                boundingBox.include(GeoPoint(it.latitude, it.longitude))
+                pointsIncluded++
+            }
         }
-    }
-}
 
-/**
- * Creates a marker for a sighting with all appropriate settings.
- */
-private fun createSightingMarker(
-    view: MapView,
-    sighting: Sighting,
-    icon: Drawable?,
-    onSightingClick: (Int) -> Unit
-): Marker {
-    return Marker(view).apply {
-        id = sighting.id.toString()
-        position = GeoPoint(sighting.latitude, sighting.longitude)
-        title = sighting.city ?: "Sighting ${sighting.id}"
-        snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
-        this.icon = icon
-        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        relatedObject = sighting
-        infoWindow = SightingInfoWindow(view, onSightingClick)
-        setOnMarkerClickListener { marker, mapView ->
-            InfoWindow.closeAllInfoWindowsOn(mapView)
-            marker.showInfoWindow()
-            true
+        // Check if boundingBox has valid span
+        // The original check was `!boundingBox.isNull() && boundingBox.width > 0 && boundingBox.height > 0`
+        // `isNull()` on BoundingBox checks if all values are zero.
+        // A more direct check for a valid span after including points:
+        if (pointsIncluded > 0 && (boundingBox.latitudeSpan > 1E-6 || boundingBox.longitudeSpan > 1E-6) ) { // Check for a minimal span
+            try {
+                view.zoomToBoundingBox(boundingBox, true, 50) // 50px padding
+                Timber.tag(TAG).d("Zoomed to bounding box of $pointsIncluded sightings.")
+            } catch (e: IllegalArgumentException) {
+                Timber.tag(TAG).e(e, "Error zooming to bounding box. Box: N:${boundingBox.latNorth} S:${boundingBox.latSouth} E:${boundingBox.lonEast} W:${boundingBox.lonWest}")
+            }
+        } else if (pointsIncluded == 1) { // Single point, zoom to it
+            view.controller.animateTo(GeoPoint(uiState.sightings.first().latitude, uiState.sightings.first().longitude))
+            view.controller.setZoom(10.0) // Example zoom level for a single point
         }
-    }
-}
-
-/**
- * Checks if coordinates are valid for display on a map.
- */
-private fun isValidCoordinate(latitude: Double, longitude: Double): Boolean {
-    // Only perform basic range checks - don't filter out 0,0 coordinates
-    // since they might be valid in some cases
-    return latitude.isFinite() && longitude.isFinite() &&
-            latitude >= -90.0 && latitude <= 90.0 &&
-            longitude >= -180.0 && longitude <= 180.0
-}
-
-/**
- * Ensures a bounding box has minimum dimensions to avoid zoom errors.
- */
-private fun ensureMinimumBoundingBoxSize(boundingBox: BoundingBox) {
-    // Get current dimensions
-    val latSpan = boundingBox.latitudeSpan
-    val lonSpan = boundingBox.longitudeSpan
-
-    // Apply minimum size if needed
-    if (latSpan < MIN_BOUNDING_BOX_SPAN_DEGREES) {
-        val midLat = boundingBox.centerLatitude
-        boundingBox.latNorth = midLat + MIN_BOUNDING_BOX_SPAN_DEGREES / 2
-        boundingBox.latSouth = midLat - MIN_BOUNDING_BOX_SPAN_DEGREES / 2
-    }
-
-    if (lonSpan < MIN_BOUNDING_BOX_SPAN_DEGREES) {
-        val midLon = boundingBox.centerLongitude
-        boundingBox.lonEast = midLon + MIN_BOUNDING_BOX_SPAN_DEGREES / 2
-        boundingBox.lonWest = midLon - MIN_BOUNDING_BOX_SPAN_DEGREES / 2
     }
 }

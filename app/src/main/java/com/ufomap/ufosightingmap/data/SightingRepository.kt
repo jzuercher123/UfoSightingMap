@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import java.io.IOException
+import timber.log.Timber // It's good practice to use Timber for logging
 
 /**
  * Repository for UFO Sighting data.
@@ -21,7 +22,8 @@ import java.io.IOException
  */
 class SightingRepository(private val sightingDao: SightingDao, private val context: Context) {
 
-    private val TAG = "SightingRepository"
+    // Using Timber for logging consistently
+    // private val TAG = "SightingRepository" // Replaced by Timber's automatic tag
 
     // Track loading state
     private val _isLoading = MutableStateFlow(false)
@@ -34,12 +36,12 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     // Expose all sightings as a Flow for reactive UI updates with error handling
     val allSightings: Flow<List<Sighting>> = sightingDao.getAllSightings()
         .onEach { list ->
-            Log.d(TAG, "Flow emitted ${list.size} sightings")
+            Timber.d("Flow emitted ${list.size} sightings")
         }
         .catch { e ->
-            Log.e(TAG, "Error in allSightings flow: ${e.message}", e)
+            Timber.e(e, "Error in allSightings flow")
             _error.value = "Failed to load sightings: ${e.message}"
-            emit(emptyList())
+            emit(emptyList()) // Emit empty list on error to prevent crash
         }
 
     // Provide paginated sightings for improved performance with large datasets
@@ -47,12 +49,11 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
         return Pager(
             config = PagingConfig(
                 pageSize = pageSize,
-                enablePlaceholders = false,
-                maxSize = pageSize * 3
-            )
-        ) {
-            sightingDao.getSightingsPaged()
-        }.flow
+                enablePlaceholders = false, // Typically false for network/db sources
+                maxSize = pageSize * 3 // Example: Keep 3 pages in memory
+            ),
+            pagingSourceFactory = { sightingDao.getSightingsPaged() } // Corrected lambda usage
+        ).flow
     }
 
     /**
@@ -61,7 +62,7 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
     fun getSightingsInBounds(north: Double, south: Double, east: Double, west: Double): Flow<List<Sighting>> {
         return sightingDao.getSightingsInBounds(north, south, east, west)
             .catch { e ->
-                Log.e(TAG, "Error getting sightings in bounds: ${e.message}", e)
+                Timber.e(e, "Error getting sightings in bounds")
                 _error.value = "Failed to get sightings in map bounds: ${e.message}"
                 emit(emptyList())
             }
@@ -69,124 +70,131 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
 
     /**
      * Initialize the database with sightings from the JSON asset file if the database is empty.
+     * This function is designed to be called from a CoroutineScope.
      */
     fun initializeDatabaseIfNeeded(scope: CoroutineScope) {
-        scope.launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.IO) { // Ensure this runs on a background thread
             try {
                 _isLoading.value = true
                 val count = sightingDao.count()
                 if (count == 0) {
-                    Log.d(TAG, "Database is empty. Loading from JSON asset.")
+                    Timber.d("Database is empty. Loading from JSON asset.")
                     loadSightingsFromJsonAndInsert()
                 } else {
-                    Log.d(TAG, "Database already contains $count sightings.")
+                    Timber.d("Database already contains $count sightings.")
                 }
-                _isLoading.value = false
             } catch (e: Exception) {
-                Log.e(TAG, "Error checking database state", e)
+                Timber.e(e, "Error checking database state or initializing")
                 _error.value = "Failed to initialize database: ${e.message}"
+            } finally {
                 _isLoading.value = false
             }
         }
     }
 
     /**
-     * Force clear the database and reload data from JSON
+     * Force clear the database and reload data from JSON.
+     * This is a suspend function, so it should be called from a coroutine.
      */
     suspend fun forceReloadData() {
+        // Ensure this is called on a background dispatcher if the caller isn't already on one
+        // withContext(Dispatchers.IO) { ... } // Can be added if needed
         try {
             _isLoading.value = true
-            _error.value = null
-            Log.d(TAG, "Forcing database clear and reload")
-            // Clear existing data
+            _error.value = null // Clear previous errors
+            Timber.d("Forcing database clear and reload")
             sightingDao.clearAllSightings()
-            // Load JSON data
-            loadSightingsFromJsonAndInsert()
-            _isLoading.value = false
+            loadSightingsFromJsonAndInsert() // This is already suspend and uses IO internally if needed
         } catch (e: Exception) {
-            Log.e(TAG, "Error during force reload: ${e.message}", e)
+            Timber.e(e, "Error during force reload")
             _error.value = "Failed to reload data: ${e.message}"
+        } finally {
             _isLoading.value = false
         }
     }
 
     /**
-     * Debug function to check if we can access asset files
+     * Debug function to check if we can access asset files.
+     * This is a synchronous function.
      */
-    // In SightingRepository.kt
     fun debugAssetFiles() {
         try {
             val files = context.assets.list("")
-            Log.d(TAG, "Asset files: ${files?.joinToString()}")
+            Timber.d("Asset files: ${files?.joinToString()}")
 
             if (files?.contains("sightings.json") == true) {
-                val jsonSize = context.assets.open("sightings.json").available()
-                Log.d(TAG, "sightings.json file size: $jsonSize bytes")
+                context.assets.open("sightings.json").use { inputStream ->
+                    val jsonSize = inputStream.available()
+                    Timber.d("sightings.json file size: $jsonSize bytes")
 
-                // Read the first 100 chars to verify content
-                val start = context.assets.open("sightings.json").bufferedReader().use {
-                    it.readText().take(100)
-                }
-                Log.d(TAG, "JSON starts with: $start...")
-
-                // Check Room database state
-                viewModelScope.launch(Dispatchers.IO) {
-                    val count = sightingDao.count()
-                    Log.d(TAG, "Current database contains $count sightings")
+                    // Read the first 100 chars to verify content
+                    val start = inputStream.bufferedReader().use {
+                        it.readText().take(100)
+                    }
+                    Timber.d("JSON starts with: $start...")
                 }
             } else {
-                Log.e(TAG, "sightings.json NOT FOUND in assets")
+                Timber.e("sightings.json NOT FOUND in assets")
                 _error.value = "sightings.json not found in assets"
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error checking assets: ${e.message}", e)
+            Timber.e(e, "Error checking assets")
             _error.value = "Failed to check asset files: ${e.message}"
         }
     }
 
     /**
-     * Gets a raw count of sightings in the database.
-     * Unlike flow-based methods, this returns a direct count for immediate use.
-     */
-    suspend fun getRawCount(): Int {
-        return sightingDao.count()
-    }
-
-
-    /**
      * Load sightings from the JSON asset file and insert them into the database.
-     * Called during initialization if the database is empty.
+     * This is a suspend function, designed to be called from a background coroutine.
      */
     private suspend fun loadSightingsFromJsonAndInsert() {
         try {
-            Log.d(TAG, "Attempting to load sightings from JSON")
+            Timber.d("Attempting to load sightings from JSON")
+            // loadSightingsFromJson is assumed to be a suspend function or handle its own threading
             val sightingsList = loadSightingsFromJson(context, "sightings.json")
-            Log.d(TAG, "JSON parsing result: ${sightingsList?.size ?: "null"} sightings")
+            Timber.d("JSON parsing result: ${sightingsList?.size ?: "null"} sightings")
 
-            if (sightingsList != null && sightingsList.isNotEmpty()) {
-                Log.d(TAG, "Inserting ${sightingsList.size} sightings into database")
-                sightingDao.insertAll(sightingsList)
-                Log.d(TAG, "Successfully loaded sightings from JSON.")
+            if (!sightingsList.isNullOrEmpty()) {
+                Timber.d("Inserting ${sightingsList.size} sightings into database")
+                sightingDao.insertAll(sightingsList) // This should be a suspend function or run on Dispatchers.IO
+                Timber.d("Successfully loaded sightings from JSON.")
             } else {
-                Log.e(TAG, "Failed to load sightings - data was null or empty")
+                Timber.e("Failed to load sightings - data was null or empty")
                 _error.value = "Failed to parse sightings data from JSON"
             }
         } catch (e: IOException) {
-            Log.e(TAG, "Error reading JSON file: ${e.message}", e)
+            Timber.e(e, "Error reading JSON file")
             _error.value = "Failed to read sightings.json: ${e.message}"
-        } catch (e: Exception) {
-            Log.e(TAG, "Error loading sightings from JSON: ${e.message}", e)
+        } catch (e: Exception) { // Catch more generic exceptions
+            Timber.e(e, "Error loading sightings from JSON")
             _error.value = "Failed to load sightings: ${e.message}"
         }
     }
 
     /**
-     * Refresh sightings from a network source
-     * TODO: Implement when adding network functionality
+     * Refresh sightings from a network source.
+     * Placeholder for future implementation.
      */
     suspend fun refreshSightings() {
-        // Future implementation for network data fetching
+        _isLoading.value = true
+        // Simulate network delay
+        // kotlinx.coroutines.delay(2000)
+        // TODO: Implement actual network data fetching logic here.
+        // For example:
+        // try {
+        //     val networkSightings = apiClient.fetchLatestSightings()
+        //     sightingDao.clearAndInsert(networkSightings) // Example DAO operation
+        //     _error.value = null
+        // } catch (e: Exception) {
+        //     Timber.e(e, "Failed to refresh sightings from network")
+        //     _error.value = "Network refresh failed: ${e.message}"
+        // } finally {
+        //     _isLoading.value = false
+        // }
+        Timber.d("refreshSightings called (not implemented yet).")
+        _isLoading.value = false // Remove this if you implement actual async work
     }
+
 
     /**
      * Get filtered sightings based on search criteria
@@ -201,9 +209,15 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
         searchText: String? = null
     ): Flow<List<Sighting>> {
         return sightingDao.getFilteredSightings(
-            shape, city, country, state, startDate, endDate, searchText
+            shape?.takeIf { it.isNotBlank() }, // Pass null if blank
+            city?.takeIf { it.isNotBlank() },
+            country?.takeIf { it.isNotBlank() },
+            state?.takeIf { it.isNotBlank() },
+            startDate?.takeIf { it.isNotBlank() },
+            endDate?.takeIf { it.isNotBlank() },
+            searchText?.takeIf { it.isNotBlank() }
         ).catch { e ->
-            Log.e(TAG, "Error getting filtered sightings: ${e.message}", e)
+            Timber.e(e, "Error getting filtered sightings")
             _error.value = "Failed to filter sightings: ${e.message}"
             emit(emptyList())
         }
@@ -211,25 +225,32 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
 
     suspend fun addUserSighting(sighting: Sighting): Result<Long> {
         return try {
+            // Ensure this runs on a background thread if not already
+            // withContext(Dispatchers.IO) {
             val id = sightingDao.insertSighting(sighting)
-            Result.success(id)
+            // }
+            if (id > 0) {
+                Timber.d("User sighting added with ID: $id")
+                Result.success(id)
+            } else {
+                Timber.e("Failed to insert user sighting, DAO returned ID: $id")
+                Result.failure(Exception("Failed to insert sighting, invalid ID returned."))
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Error adding user sighting: ${e.message}", e)
+            Timber.e(e, "Error adding user sighting")
             Result.failure(e)
         }
     }
 
-    // Get user's submissions with error handling
     fun getUserSubmissions(submittedBy: String): Flow<List<Sighting>> {
         return sightingDao.getUserSubmissions(submittedBy)
             .catch { e ->
-                Log.e(TAG, "Error getting user submissions: ${e.message}", e)
+                Timber.e(e, "Error getting user submissions for $submittedBy")
                 _error.value = "Failed to load your submissions: ${e.message}"
                 emit(emptyList())
             }
     }
 
-    // Clear error status
     fun clearError() {
         _error.value = null
     }
