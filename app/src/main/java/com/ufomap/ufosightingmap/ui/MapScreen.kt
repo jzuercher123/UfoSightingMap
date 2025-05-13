@@ -109,8 +109,12 @@ fun MapScreen(
     var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
     var markerClusterManager by remember { mutableStateOf<MarkerClusterManager?>(null) }
 
-    // Marker icons
-    val markerIcons = remember { loadMarkerIcons(context) }
+    // Setup marker icons
+    val markerIcons: Drawable? = remember {
+        ContextCompat.getDrawable(context, R.drawable.ic_ufo_marker)
+            ?: ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
+            ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
+    }
 
     // Collect sightings
     LaunchedEffect(Unit) {

@@ -1,4 +1,4 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+// Top-level build.gradle.kts
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.android) apply false
@@ -7,21 +7,14 @@ plugins {
 
 // Task to clean the build directory
 tasks.register("clean") {
-    delete(rootProject.buildDir)
+    delete(rootProject.layout.buildDirectory)
 }
-
 // Print Gradle, AGP, and Kotlin versions for debugging
 tasks.register("versions") {
     doLast {
         val gradleVersion = project.gradle.gradleVersion
         println("Gradle version: $gradleVersion")
-
-        // Try to get AGP version
-        val agpVersion = libs.versions.agp.get()
-        println("Android Gradle Plugin version: $agpVersion")
-
-        // Try to get Kotlin version
-        val kotlinVersion = libs.versions.kotlin.get()
-        println("Kotlin version: $kotlinVersion")
+        println("Android Gradle Plugin version: 8.9.2")
+        println("Kotlin version: 1.9.10")
     }
 }

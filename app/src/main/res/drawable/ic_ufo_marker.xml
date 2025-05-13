@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="48" height="64" viewBox="0 0 48 64" xmlns="http://www.w3.org/2000/svg">
+    <!-- UFO Marker Base -->
+    <defs>
+        <!-- Shadow for the marker -->
+        <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+            <feOffset dx="0" dy="2" result="offsetblur" />
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.5" />
+            </feComponentTransfer>
+            <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <!-- Gradient for the UFO body -->
+        <linearGradient id="ufoGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#87CEEB" />
+            <stop offset="100%" stop-color="#4682B4" />
+        </linearGradient>
+
+        <!-- Glow effect for the bottom of the UFO -->
+        <radialGradient id="beamGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+            <stop offset="0%" stop-color="#FFFF66" stop-opacity="0.8" />
+            <stop offset="100%" stop-color="#FFFF66" stop-opacity="0" />
+        </radialGradient>
+    </defs>
+
+    <!-- Marker Pin Base -->
+    <path d="M24,64 C24,64 44,44 44,24 C44,10.745 35.255,0 24,0 C12.745,0 4,10.745 4,24 C4,44 24,64 24,64 Z"
+        fill="#6200EE"
+        filter="url(#shadow)" />
+
+    <!-- UFO Body (Flying Saucer) -->
+    <ellipse cx="24" cy="20" rx="20" ry="8" fill="url(#ufoGradient)" />
+
+    <!-- UFO Dome (Cockpit) -->
+    <ellipse cx="24" cy="16" rx="8" ry="4" fill="#E0E0E0" />
+    <ellipse cx="24" cy="16" rx="6" ry="3" fill="#D1F6FF" opacity="0.7" />
+
+    <!-- UFO Ring -->
+    <ellipse cx="24" cy="20" rx="16" ry="3" fill="#9E9E9E" />
+
+    <!-- UFO Bottom Lights -->
+    <circle cx="16" cy="20" r="1.5" fill="#FFFF00" />
+    <circle cx="32" cy="20" r="1.5" fill="#FFFF00" />
+    <circle cx="20" cy="21" r="1" fill="#FFFF00" />
+    <circle cx="28" cy="21" r="1" fill="#FFFF00" />
+    <circle cx="24" cy="21.5" r="1" fill="#FFFF00" />
+
+    <!-- Tractor Beam Glow Effect -->
+    <ellipse cx="24" cy="26" rx="8" ry="4" fill="url(#beamGlow)" opacity="0.5" />
+
+    <!-- Small Stars (to give a space theme) -->
+    <circle cx="10" cy="13" r="0.8" fill="white" />
+    <circle cx="38" cy="10" r="0.8" fill="white" />
+    <circle cx="14" cy="8" r="0.8" fill="white" />
+    <circle cx="34" cy="14" r="0.8" fill="white" />
+</svg>
