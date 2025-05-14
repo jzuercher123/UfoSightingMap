@@ -283,12 +283,23 @@ fun MapScreen(
                 factory = { ctx ->
                     MapView(ctx).apply {
                         Timber.tag(TAG).d("MapView factory invoked.")
-                        setTileSource(TileSourceFactory.MAPNIK)
+                        try {
+                            mapView?.setTileSource(TileSourceFactory.USGS_SAT)
+                        } catch (e: Exception) {
+                            Timber.tag("MapScreen").e(e, "Error setting tile source: ${e.message}")
+                            // Fallback to a different source
+                            try {
+                                mapView?.setTileSource(TileSourceFactory.WIKIMEDIA)
+                            } catch (e2: Exception) {
+                                Timber.tag("MapScreen")
+                                    .e(e2, "Error setting fallback tile source: ${e2.message}")
+                            }
+                        }// Or another like WIKIMEDIA or OpenTopo
                         setMultiTouchControls(true)
                         // controller.setZoomButtonVisibility(MapView.ZoomButtonVisibility.SHOW_AND_FADEOUT) // Old way
                         // TODO FIX DEPRECATION ISSUE WITH setBuildInZoomControls() and displayZoomControls()
-                        //setBuiltInZoomControls(true) // CORRECTED for controlling zoom buttons
-                        //displayZoomControls(false) // Optionally hide them if using custom controls or gestures primarily
+                        setBuiltInZoomControls(true) // CORRECTED for controlling zoom buttons
+                        displayZoomControls(false) // Optionally hide them if using custom controls or gestures primarily
 
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)

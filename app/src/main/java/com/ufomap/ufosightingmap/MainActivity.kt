@@ -17,6 +17,9 @@ import androidx.preference.PreferenceManager
 import com.ufomap.ufosightingmap.ui.UFOSightingsNavGraph
 import com.ufomap.ufosightingmap.ui.theme.UfoSightingMapTheme
 import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import java.io.File
+import timber.log.Timber
 
 /**
  * Main entry point for the UFO Sighting Map application.
@@ -27,19 +30,42 @@ import org.osmdroid.config.Configuration
  */
 class MainActivity : ComponentActivity() {
 
+
     // Permission request handler for location access
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (isGranted) {
-                Log.i("Permission", "Location permission granted")
+                Timber.tag("Permission").i("Location permission granted")
             } else {
-                Log.w("Permission", "Location permission denied")
+                Timber.tag("Permission").w("Location permission denied")
             }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Configuration.getInstance().isMapViewHardwareAccelerated = true
+        Configuration.getInstance().tileDownloadThreads = 4
+        Configuration.getInstance().tileDownloadMaxQueueSize = 32
+        Configuration.getInstance().tileFileSystemThreads = 4
+        // Create directories for the tile cache
+        val osmConfig = Configuration.getInstance()
+        val basePath = File(applicationContext.cacheDir.absolutePath, "osmdroid")
+        basePath.mkdirs()
+        val tileCache = File(basePath, "tiles")
+        tileCache.mkdirs()
 
+// Set explicit cache paths and permissions
+        osmConfig.osmdroidBasePath = basePath
+        osmConfig.osmdroidTileCache = tileCache
+
+// Set a specific user agent
+        osmConfig.userAgentValue = applicationContext.packageName + "/" + BuildConfig.VERSION_NAME
+
+// Then proceed with your existing configuration
+        osmConfig.load(
+            applicationContext,
+            PreferenceManager.getDefaultSharedPreferences(applicationContext)
+        )
         // Configure OSMDroid
         Configuration.getInstance().apply {
             load(
@@ -50,7 +76,8 @@ class MainActivity : ComponentActivity() {
             userAgentValue = applicationContext.packageName
         }
 
-        Log.i("MainActivity", "OSMDroid configuration loaded. User Agent: ${Configuration.getInstance().userAgentValue}")
+        Timber.tag("MainActivity")
+            .i("OSMDroid configuration loaded. User Agent: ${Configuration.getInstance().userAgentValue}")
 
         // Request location permission for user location features
         requestLocationPermission()
@@ -82,18 +109,18 @@ class MainActivity : ComponentActivity() {
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED -> {
-                Log.i("Permission", "Location permission already granted")
+                Timber.tag("Permission").i("Location permission already granted")
             }
 
             // Show rationale if needed
             shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) -> {
-                Log.w("Permission", "Showing rationale for location permission")
+                Timber.tag("Permission").w("Showing rationale for location permission")
                 requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
 
             // Request permission
             else -> {
-                Log.i("Permission", "Requesting location permission")
+                Timber.tag("Permission").i("Requesting location permission")
                 requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
             }
         }
@@ -101,16 +128,16 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        Log.d("MainActivity", "onResume")
+        Timber.tag("MainActivity").d("onResume")
     }
 
     override fun onPause() {
         super.onPause()
-        Log.d("MainActivity", "onPause")
+        Timber.tag("MainActivity").d("onPause")
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d("MainActivity", "onDestroy")
+        Timber.tag("MainActivity").d("onDestroy")
     }
 }

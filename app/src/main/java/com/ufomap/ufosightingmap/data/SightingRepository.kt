@@ -13,8 +13,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import timber.log.Timber // It's good practice to use Timber for logging
+
 
 /**
  * Repository for UFO Sighting data.
@@ -68,11 +70,8 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
             }
     }
 
-    fun getRawCount(): Int {
-
-        Log.d("SightingRepository", "getRawCount called")
-        return sightingDao.getRawCount()
-
+    suspend fun getRawCount(): Int = withContext(Dispatchers.IO) {
+        return@withContext sightingDao.getRawCount()
     }
 
 
