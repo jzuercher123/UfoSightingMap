@@ -81,4 +81,7 @@ interface SightingDao {
     // Search sightings by summary content
     @Query("SELECT * FROM sightings WHERE summary LIKE '%' || :keyword || '%' ORDER BY dateTime DESC")
     fun searchSightingsBySummary(keyword: String): Flow<List<Sighting>>
+
+    @Query("SELECT COUNT(*) FROM sightings")
+    fun getRawCount(): Int
 }

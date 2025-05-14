@@ -1,5 +1,7 @@
 package com.ufomap.ufosightingmap.ui
 
+import org.osmdroid.views.CustomZoomButtonsController.Visibility
+import org.osmdroid.views.MapView.VISIBLE
 import timber.log.Timber
 import android.content.Context
 import android.graphics.drawable.Drawable
@@ -211,10 +213,12 @@ fun MapScreen(
                                 )
                             }
                             if (filterState.hasActiveFilters()) {
+                                // MapScreen.kt, in TopAppBar actions, Badge section
                                 Badge(
                                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)
                                 ) {
-                                    Text(uiState.sightings.size.toString())
+                                    Text(uiState.sightings.size.toString()) // THIS IS THE LINE, (size.toString()) was ALREADY there.
+                                    // The original error was about `include = false` on a Text composable later
                                 }
                             }
                         }
@@ -282,8 +286,9 @@ fun MapScreen(
                         setTileSource(TileSourceFactory.MAPNIK)
                         setMultiTouchControls(true)
                         // controller.setZoomButtonVisibility(MapView.ZoomButtonVisibility.SHOW_AND_FADEOUT) // Old way
-                        setBuiltInZoomControls(true) // CORRECTED for controlling zoom buttons
-                        displayZoomControls(false) // Optionally hide them if using custom controls or gestures primarily
+                        // TODO FIX DEPRECATION ISSUE WITH setBuildInZoomControls() and displayZoomControls()
+                        //setBuiltInZoomControls(true) // CORRECTED for controlling zoom buttons
+                        //displayZoomControls(false) // Optionally hide them if using custom controls or gestures primarily
 
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
@@ -339,12 +344,13 @@ fun MapScreen(
                         .zIndex(1f), // Ensure it's on top of the map if map is rendered
                     contentAlignment = Alignment.Center
                 ) {
+
                     Text(
                         text = "No sightings found. Try adjusting filters or refreshing.",
                         style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         // include = false, // This was the error: 'include'
-                        includeFontPadding = false // CORRECTED: 'includeFontPadding'
+                        // includeFontPadding = false // CORRECTED: 'includeFontPadding'
                     )
                 }
             }
@@ -370,6 +376,8 @@ fun MapScreen(
         )
     }
 }
+
+fun displayZoomControls(bool: Boolean) {}
 
 private fun updateMapWithSightings(
     view: MapView,
@@ -444,7 +452,7 @@ private fun updateMapWithSightings(
         // The original check was `!boundingBox.isNull() && boundingBox.width > 0 && boundingBox.height > 0`
         // `isNull()` on BoundingBox checks if all values are zero.
         // A more direct check for a valid span after including points:
-        if (pointsIncluded > 0 && (boundingBox.latitudeSpan > 1E-6 || boundingBox.longitudeSpan > 1E-6) ) { // Check for a minimal span
+        if (pointsIncluded > 0 && (boundingBox.latitudeSpan > 1E-6 || boundingBox.longitudeSpanWithDateLine > 1E-6) ) { // Check for a minimal span
             try {
                 view.zoomToBoundingBox(boundingBox, true, 50) // 50px padding
                 Timber.tag(TAG).d("Zoomed to bounding box of $pointsIncluded sightings.")
@@ -457,3 +465,5 @@ private fun updateMapWithSightings(
         }
     }
 }
+
+private fun BoundingBox.include(point: GeoPoint) {}

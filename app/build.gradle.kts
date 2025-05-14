@@ -162,6 +162,9 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.room.testing)
 
+    implementation("androidx.lifecycle:lifecycle-process:2.6.2") // Or the latest stable version
+
+
     // Android Testing
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

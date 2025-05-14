@@ -68,6 +68,14 @@ class SightingRepository(private val sightingDao: SightingDao, private val conte
             }
     }
 
+    fun getRawCount(): Int {
+
+        Log.d("SightingRepository", "getRawCount called")
+        return sightingDao.getRawCount()
+
+    }
+
+
     /**
      * Initialize the database with sightings from the JSON asset file if the database is empty.
      * This function is designed to be called from a CoroutineScope.
