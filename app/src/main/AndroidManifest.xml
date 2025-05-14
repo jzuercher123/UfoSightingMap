@@ -45,10 +45,21 @@
             </intent-filter>
         </activity>
 
+        <!-- Needed for older Android versions -->
         <uses-library
             android:name="org.apache.http.legacy"
             android:required="false" />
 
+        <!-- Provider for sharing files with other apps if needed -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

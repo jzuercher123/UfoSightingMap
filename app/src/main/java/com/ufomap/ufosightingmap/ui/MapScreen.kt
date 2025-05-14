@@ -9,18 +9,13 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-// import androidx.compose.foundation.layout.Row // Not used directly, can be removed if not needed elsewhere
-// import androidx.compose.foundation.layout.Spacer // Not used directly
 import androidx.compose.foundation.layout.fillMaxSize
-// import androidx.compose.foundation.layout.fillMaxWidth // Not used directly
-// import androidx.compose.foundation.layout.height // Not used directly
 import androidx.compose.foundation.layout.padding
-// import androidx.compose.foundation.layout.width // Not used directly
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Refresh // ADDED IMPORT
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,10 +23,9 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-// import androidx.compose.material3.ModalBottomSheetDefaults // Not used directly
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost // For Snackbar display
-import androidx.compose.material3.SnackbarHostState // For Snackbar display
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,13 +57,14 @@ import com.ufomap.ufosightingmap.utils.MarkerClusterManager
 import com.ufomap.ufosightingmap.viewmodel.MapViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.infowindow.InfoWindow // Keep this for custom info window logic
-// import org.osmdroid.views.overlay.infowindow.BasicInfoWindow // If SightingInfoWindow is not used
+import org.osmdroid.views.overlay.infowindow.InfoWindow
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 
@@ -82,7 +77,6 @@ private const val TAG = "MapScreen"
 data class MapUiState(
     val isLoading: Boolean = true,
     val showFilterSheet: Boolean = false,
-    // val filterApplied: Boolean = false, // This can be derived from filterState directly
     val sightings: List<Sighting> = emptyList(),
     val errorMessage: String? = null
 )
@@ -99,7 +93,7 @@ fun MapScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var uiState by remember { mutableStateOf(MapUiState()) }
-    val snackbarHostState = remember { SnackbarHostState() } // For Snackbar
+    val snackbarHostState = remember { SnackbarHostState() }
 
     var mapView: MapView? by remember { mutableStateOf(null) }
     var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
@@ -107,16 +101,16 @@ fun MapScreen(
     val bottomSheetState = rememberModalBottomSheetState()
 
     val filterState by viewModel.filterState.collectAsState()
-    val isLoadingFromViewModel by viewModel.isLoading.collectAsState() // Collect ViewModel's loading state
+    val isLoadingFromViewModel by viewModel.isLoading.collectAsState()
 
-    val defaultMarkerIcon: Drawable? = remember(context) { // Ensure context is a key for remember
+    val defaultMarkerIcon: Drawable? = remember(context) {
         ContextCompat.getDrawable(context, R.drawable.ic_marker_default)
-            ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map) // Fallback
+            ?: ContextCompat.getDrawable(context, android.R.drawable.ic_dialog_map)
     }
 
     val userSubmittedMarkerIcon: Drawable? = remember(context, defaultMarkerIcon) {
         ContextCompat.getDrawable(context, R.drawable.ic_marker_user_submitted)
-            ?: defaultMarkerIcon // Fallback to default
+            ?: defaultMarkerIcon
     }
 
     LaunchedEffect(isLoadingFromViewModel, viewModel.sightings) {
@@ -124,22 +118,14 @@ fun MapScreen(
             Timber.tag(TAG).d("Sightings loaded: ${sightings.size}")
             uiState = uiState.copy(
                 sightings = sightings,
-                // isLoading should primarily be driven by the ViewModel's state
-                // isLoading = isLoadingFromViewModel && sightings.isEmpty() // More robust loading
                 isLoading = isLoadingFromViewModel
             )
 
-            // If ViewModel indicates loading is done, but we were still showing loading locally, stop.
             if (!isLoadingFromViewModel && uiState.isLoading) {
                 uiState = uiState.copy(isLoading = false)
             }
         }
     }
-    LaunchedEffect(Unit) {
-        // Initial load trigger if needed, or rely on ViewModel's init
-        // viewModel.loadInitialData() // Example if you have such a method
-    }
-
 
     LaunchedEffect(Unit) {
         viewModel.errorState.collectLatest { errorMessage ->
@@ -149,7 +135,7 @@ fun MapScreen(
                     message = errorMessage,
                     actionLabel = "Dismiss"
                 )
-                viewModel.clearErrorMessage() // Clear error in VM after showing
+                viewModel.clearErrorMessage()
             }
         }
     }
@@ -162,8 +148,8 @@ fun MapScreen(
                 Lifecycle.Event.ON_DESTROY -> {
                     Timber.tag(TAG).d("MapScreen ON_DESTROY: Detaching MapView and disabling location.")
                     locationOverlay?.disableMyLocation()
-                    mapView?.onDetach() // Ensures map resources are released
-                    mapView = null // Help GC
+                    mapView?.onDetach()
+                    mapView = null
                     locationOverlay = null
                     markerClusterManager = null
                 }
@@ -174,7 +160,6 @@ fun MapScreen(
         onDispose {
             Timber.tag(TAG).d("MapScreen onDispose: Removing observer.")
             lifecycleOwner.lifecycle.removeObserver(observer)
-            // Ensure cleanup even if not fully destroyed, e.g., config change
             if (lifecycleOwner.lifecycle.currentState != Lifecycle.State.DESTROYED) {
                 mapView?.onPause()
             }
@@ -182,7 +167,7 @@ fun MapScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) }, // Add SnackbarHost
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -190,10 +175,10 @@ fun MapScreen(
                     actions = {
                         IconButton(onClick = {
                             Timber.tag(TAG).d("Refresh button clicked")
-                            viewModel.refreshData() // Assuming you have a refresh method
+                            viewModel.refreshData()
                         }) {
                             Icon(
-                                Icons.Filled.Refresh, // CORRECTED ICON
+                                Icons.Filled.Refresh,
                                 contentDescription = "Refresh Data"
                             )
                         }
@@ -203,7 +188,7 @@ fun MapScreen(
                                 contentDescription = "Correlation Analysis"
                             )
                         }
-                        Box { // Wrap IconButton and Badge in a Box for proper badge placement
+                        Box {
                             IconButton(onClick = {
                                 uiState = uiState.copy(showFilterSheet = true)
                             }) {
@@ -213,12 +198,10 @@ fun MapScreen(
                                 )
                             }
                             if (filterState.hasActiveFilters()) {
-                                // MapScreen.kt, in TopAppBar actions, Badge section
                                 Badge(
                                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)
                                 ) {
-                                    Text(uiState.sightings.size.toString()) // THIS IS THE LINE, (size.toString()) was ALREADY there.
-                                    // The original error was about `include = false` on a Text composable later
+                                    Text(uiState.sightings.size.toString())
                                 }
                             }
                         }
@@ -283,51 +266,73 @@ fun MapScreen(
                 factory = { ctx ->
                     MapView(ctx).apply {
                         Timber.tag(TAG).d("MapView factory invoked.")
-                        try {
-                            mapView?.setTileSource(TileSourceFactory.USGS_SAT)
-                        } catch (e: Exception) {
-                            Timber.tag("MapScreen").e(e, "Error setting tile source: ${e.message}")
-                            // Fallback to a different source
-                            try {
-                                mapView?.setTileSource(TileSourceFactory.WIKIMEDIA)
-                            } catch (e2: Exception) {
-                                Timber.tag("MapScreen")
-                                    .e(e2, "Error setting fallback tile source: ${e2.message}")
-                            }
-                        }// Or another like WIKIMEDIA or OpenTopo
-                        setMultiTouchControls(true)
-                        // controller.setZoomButtonVisibility(MapView.ZoomButtonVisibility.SHOW_AND_FADEOUT) // Old way
-                        // TODO FIX DEPRECATION ISSUE WITH setBuildInZoomControls() and displayZoomControls()
-                        setBuiltInZoomControls(true) // CORRECTED for controlling zoom buttons
-                        displayZoomControls(false) // Optionally hide them if using custom controls or gestures primarily
 
+                        // Set user agent at the Configuration level, not on individual tile sources
+                        // This fixes the "unresolved reference" error
+                        Configuration.getInstance().userAgentValue = ctx.packageName
+
+                        // UPDATED TILE SOURCE CONFIGURATION
+                        // Try custom tile source with explicit HTTPS
+                        val tileSource = XYTileSource(
+                            "OpenStreetMap",
+                            0, 19, 256, ".png",
+                            arrayOf("https://a.tile.openstreetmap.org/",
+                                "https://b.tile.openstreetmap.org/",
+                                "https://c.tile.openstreetmap.org/"),
+                            "© OpenStreetMap contributors"
+                        )
+
+                        // Use the tile source
+                        setTileSource(tileSource)
+
+                        // Enable built-in zoom controls
+                        setMultiTouchControls(true)
+                        zoomController.setVisibility(Visibility.SHOW_AND_FADEOUT)
+
+                        // debug tile source
+                        Log.d(TAG, "Tile source: $tileSource")
+
+                        // Initial zoom and center
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
 
+                        // Add logging for tile loading
+                        addOnFirstLayoutListener { _, _, _, _, _ ->
+                            Log.d(TAG, "MapView first layout complete, ready to load tiles")
+                        }
+
+                        // Setup location overlay
                         val locProvider = GpsMyLocationProvider(ctx)
+                        locProvider.locationUpdateMinTime = 10000 // 10 seconds
+                        locProvider.locationUpdateMinDistance = 10f // 10 meters
+
                         val newLocationOverlay = MyLocationNewOverlay(locProvider, this)
                         try {
                             newLocationOverlay.enableMyLocation()
+                            Log.d(TAG, "Location overlay enabled")
                         } catch (e: SecurityException) {
                             Timber.tag(TAG).w(e, "Location permission not granted for MyLocationOverlay.")
                         }
                         overlays.add(newLocationOverlay)
                         locationOverlay = newLocationOverlay
 
+                        // Setup marker cluster manager
                         markerClusterManager = MarkerClusterManager(ctx, this).apply {
                             setAnimation(true)
-                            setMaxClusteringZoomLevel(15.0) // Example, adjust as needed
+                            setMaxClusteringZoomLevel(15.0)
                         }
-                        mapView = this // Assign to the state variable
+
+                        // Set tile loading listener
+                        addOnTilesLoadedListener {
+                            Log.d(TAG, "Tiles loaded successfully")
+                        }
+
+                        mapView = this
                         Timber.tag(TAG).d("MapView created and initialized in factory.")
                     }
                 },
                 update = { view ->
                     Timber.tag(TAG).d("MapView update called with ${uiState.sightings.size} sightings.")
-                    // The error "Argument type mismatch: actual type is 'android.graphics.drawable.Drawable?',
-                    // but 'kotlin.collections.Map<kotlin.String, android.graphics.drawable.Drawable?>' was expected."
-                    // is very strange if it points to this call, as the function signature matches.
-                    // Ensuring the passed drawables are indeed Drawable? and not something else.
                     updateMapWithSightings(
                         view,
                         uiState,
@@ -342,7 +347,7 @@ fun MapScreen(
             if (uiState.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier
-                        .align(Alignment.Center) // CORRECTED Modifier usage
+                        .align(Alignment.Center)
                         .zIndex(1f)
                 )
             }
@@ -352,20 +357,16 @@ fun MapScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
-                        .zIndex(1f), // Ensure it's on top of the map if map is rendered
+                        .zIndex(1f),
                     contentAlignment = Alignment.Center
                 ) {
-
                     Text(
                         text = "No sightings found. Try adjusting filters or refreshing.",
                         style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        // include = false, // This was the error: 'include'
-                        // includeFontPadding = false // CORRECTED: 'includeFontPadding'
+                        textAlign = TextAlign.Center
                     )
                 }
             }
-            // Error Snackbar is handled by Scaffold's snackbarHost
         }
     }
 
@@ -377,25 +378,24 @@ fun MapScreen(
             },
             onApplyFilters = { shape, state, country ->
                 viewModel.updateFilters(shape = shape, state = state, country = country)
-                uiState = uiState.copy(showFilterSheet = false) // Dismiss after applying
+                uiState = uiState.copy(showFilterSheet = false)
             },
             onClearFilters = {
                 viewModel.clearFilters()
-                // uiState = uiState.copy(showFilterSheet = false) // Optionally dismiss
             },
             sheetState = bottomSheetState
         )
     }
 }
 
-fun displayZoomControls(bool: Boolean) {}
+fun addOnTilesLoadedListener(function: () -> Int) {}
 
 private fun updateMapWithSightings(
     view: MapView,
     uiState: MapUiState,
-    markerClusterMgr: MarkerClusterManager?, // Renamed for clarity
-    defaultIcon: Drawable?, // Renamed for clarity
-    userSubmittedIcon: Drawable?, // Renamed for clarity
+    markerClusterMgr: MarkerClusterManager?,
+    defaultIcon: Drawable?,
+    userSubmittedIcon: Drawable?,
     onSightingClick: (Int) -> Unit
 ) {
     val clusterManager = markerClusterMgr ?: run {
@@ -404,7 +404,7 @@ private fun updateMapWithSightings(
     }
 
     Timber.tag(TAG).d("Updating map. Sightings count: ${uiState.sightings.size}")
-    clusterManager.clearItems() // Clear previous markers
+    clusterManager.clearItems()
 
     var validMarkersCount = 0
     uiState.sightings.forEach { sighting ->
@@ -413,27 +413,24 @@ private fun updateMapWithSightings(
             sighting.longitude >= -180.0 && sighting.longitude <= 180.0) {
 
             val marker = Marker(view).apply {
-                id = sighting.id.toString() // Ensure ID is unique if possible
+                id = sighting.id.toString()
                 position = GeoPoint(sighting.latitude, sighting.longitude)
                 title = sighting.city ?: "Sighting #${sighting.id}"
                 snippet = "Shape: ${sighting.shape ?: "Unknown"}\n${sighting.summary ?: ""}"
                 icon = if (sighting.isUserSubmitted) userSubmittedIcon ?: defaultIcon else defaultIcon
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                relatedObject = sighting // Attach the Sighting object for later use
+                relatedObject = sighting
 
-                // Setup custom info window
                 infoWindow = SightingInfoWindow(view, onSightingClick)
-                // It's common to show info window on click
                 setOnMarkerClickListener { m, mv ->
-                    // Close other info windows before opening a new one
                     InfoWindow.closeAllInfoWindowsOn(mv)
                     if (m.isInfoWindowShown) {
                         m.closeInfoWindow()
                     } else {
                         m.showInfoWindow()
                     }
-                    mv.controller.animateTo(m.position) // Center map on marker
-                    true // Event consumed
+                    mv.controller.animateTo(m.position)
+                    true
                 }
             }
             clusterManager.addItem(marker)
@@ -443,10 +440,9 @@ private fun updateMapWithSightings(
         }
     }
     Timber.tag(TAG).d("Added $validMarkersCount valid markers to cluster manager.")
-    clusterManager.invalidate() // Re-cluster and draw
-    view.invalidate() // Redraw the map view itself
+    clusterManager.invalidate()
+    view.invalidate()
 
-    // Auto-zoom logic (optional, can be resource-intensive with many markers)
     if (validMarkersCount > 0 && uiState.sightings.isNotEmpty()) {
         val boundingBox = BoundingBox()
         var pointsIncluded = 0
@@ -459,22 +455,33 @@ private fun updateMapWithSightings(
             }
         }
 
-        // Check if boundingBox has valid span
-        // The original check was `!boundingBox.isNull() && boundingBox.width > 0 && boundingBox.height > 0`
-        // `isNull()` on BoundingBox checks if all values are zero.
-        // A more direct check for a valid span after including points:
-        if (pointsIncluded > 0 && (boundingBox.latitudeSpan > 1E-6 || boundingBox.longitudeSpanWithDateLine > 1E-6) ) { // Check for a minimal span
+        if (pointsIncluded > 0 && (boundingBox.latitudeSpan > 1E-6 || boundingBox.longitudeSpanWithDateLine > 1E-6)) {
             try {
-                view.zoomToBoundingBox(boundingBox, true, 50) // 50px padding
+                view.zoomToBoundingBox(boundingBox, true, 50)
                 Timber.tag(TAG).d("Zoomed to bounding box of $pointsIncluded sightings.")
             } catch (e: IllegalArgumentException) {
                 Timber.tag(TAG).e(e, "Error zooming to bounding box. Box: N:${boundingBox.latNorth} S:${boundingBox.latSouth} E:${boundingBox.lonEast} W:${boundingBox.lonWest}")
             }
-        } else if (pointsIncluded == 1) { // Single point, zoom to it
+        } else if (pointsIncluded == 1) {
             view.controller.animateTo(GeoPoint(uiState.sightings.first().latitude, uiState.sightings.first().longitude))
-            view.controller.setZoom(10.0) // Example zoom level for a single point
+            view.controller.setZoom(10.0)
         }
     }
 }
 
-private fun BoundingBox.include(point: GeoPoint) {}
+// Helper extension method for BoundingBox
+private fun BoundingBox.include(point: GeoPoint) {
+    val north = maxOf(this.latNorth, point.latitude)
+    val south = minOf(this.latSouth, point.latitude)
+    val east = maxOf(this.lonEast, point.longitude)
+    val west = minOf(this.lonWest, point.longitude)
+
+    // Create a new bounding box with updated values
+    val newBox = BoundingBox(north, east, south, west)
+
+    // Set values for this bounding box
+    this.latNorth = newBox.latNorth
+    this.latSouth = newBox.latSouth
+    this.lonEast = newBox.lonEast
+    this.lonWest = newBox.lonWest
+}
