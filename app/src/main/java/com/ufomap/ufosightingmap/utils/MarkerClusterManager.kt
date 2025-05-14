@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
+import android.util.Log
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -23,6 +24,8 @@ class MarkerClusterManager(
     private val context: Context,
     private val mapView: MapView
 ) {
+    private val TAG = "MarkerClusterManager"
+
     // List of all markers
     private val markers = mutableListOf<Marker>()
 
@@ -37,11 +40,6 @@ class MarkerClusterManager(
     // Current clusters
     private val visibleClusters = mutableListOf<MarkerCluster>()
 
-    init {
-        // Add cluster overlay to map
-        mapView.overlays.add(clusterOverlay)
-    }
-
     /**
      * Add a marker to be managed by the cluster manager
      */
@@ -50,9 +48,18 @@ class MarkerClusterManager(
     }
 
     /**
+     * Add multiple markers to be managed
+     */
+    fun addItems(items: Collection<Marker>) {
+        markers.addAll(items)
+    }
+
+    /**
      * Remove all managed markers
      */
     fun clearItems() {
+        // Remove all markers from the map
+        mapView.overlays.removeAll(markers)
         markers.clear()
         visibleClusters.clear()
     }
@@ -79,26 +86,34 @@ class MarkerClusterManager(
     }
 
     /**
+     * Get the cluster overlay to add to the map
+     */
+    fun getClusterOverlay(): ClusterOverlay {
+        return clusterOverlay
+    }
+
+    /**
      * Update the clustering based on current map state
      */
     fun invalidate() {
+        Log.d(TAG, "Invalidating clusters at zoom level: ${mapView.zoomLevelDouble}")
+
+        // Remove all individual markers from map before reclustering
+        mapView.overlays.removeAll(markers)
+
         // Skip clustering if we're zoomed in too far
         if (mapView.zoomLevelDouble > maxClusteringZoomLevel) {
             // Show all markers individually
             visibleClusters.clear()
 
             // Add all individual markers to map
-            mapView.overlays.removeAll(markers)
             mapView.overlays.addAll(markers)
-
-            return
+            Log.d(TAG, "Zoomed in past clustering threshold. Adding ${markers.size} individual markers.")
+        } else {
+            // Create clusters
+            createClusters()
+            Log.d(TAG, "Created ${visibleClusters.size} clusters from ${markers.size} markers")
         }
-
-        // Remove all individual markers
-        mapView.overlays.removeAll(markers)
-
-        // Create clusters
-        createClusters()
 
         // Force map refresh
         mapView.invalidate()
@@ -290,26 +305,27 @@ class MarkerClusterManager(
         }
 
         private fun handleClusterTap(cluster: MarkerCluster, mapView: MapView) {
-            // If not many items, just zoom in
-            if (cluster.size <= 10) {
-                // Zoom in on the cluster
-                mapView.controller.animateTo(cluster.position)
-                mapView.controller.zoomIn()
-                return
-            }
+            Log.d(TAG, "Cluster tapped: ${cluster.size} markers")
 
-            // For larger clusters, show a selection dialog
-            // (In a real implementation, this would show a bottom sheet or dialog
-            // listing the markers in the cluster)
-
-            // For now, just zoom in
+            // Zoom in on the cluster
             mapView.controller.animateTo(cluster.position)
-            mapView.controller.zoomIn()
-        }
-    }
 
-    fun addItems(items: Collection<Marker>) {
-        markers.addAll(items)
+            // If already at max clustering zoom level, expand this specific cluster
+            if (mapView.zoomLevelDouble >= maxClusteringZoomLevel - 1) {
+                // Add all markers in this cluster to the map
+                val items = cluster.getItems()
+                mapView.overlays.addAll(items)
+
+                // Remove the cluster from visible clusters
+                visibleClusters.remove(cluster)
+
+                // Redraw
+                mapView.invalidate()
+            } else {
+                // Otherwise just zoom in
+                mapView.controller.zoomIn()
+            }
+        }
     }
 
     // Add method to remove individual markers
@@ -321,7 +337,6 @@ class MarkerClusterManager(
         }
         return removed
     }
-
 
     /**
      * Create a bitmap drawable for cluster markers

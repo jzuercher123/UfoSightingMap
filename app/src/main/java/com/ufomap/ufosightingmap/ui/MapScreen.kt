@@ -1,7 +1,6 @@
 package com.ufomap.ufosightingmap.ui
 
 import org.osmdroid.views.CustomZoomButtonsController.Visibility
-import org.osmdroid.views.MapView.VISIBLE
 import timber.log.Timber
 import android.content.Context
 import android.graphics.drawable.Drawable
@@ -27,7 +26,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -50,16 +48,16 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.ufomap.ufosightingmap.BuildConfig
 import com.ufomap.ufosightingmap.R
 import com.ufomap.ufosightingmap.data.Sighting
 import com.ufomap.ufosightingmap.utils.MarkerClusterManager
 import com.ufomap.ufosightingmap.viewmodel.MapViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.tileprovider.tilesource.XYTileSource
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
@@ -267,39 +265,19 @@ fun MapScreen(
                     MapView(ctx).apply {
                         Timber.tag(TAG).d("MapView factory invoked.")
 
-                        // Set user agent at the Configuration level, not on individual tile sources
-                        // This fixes the "unresolved reference" error
+                        // Set user agent at the Configuration level
                         Configuration.getInstance().userAgentValue = ctx.packageName
 
-                        // UPDATED TILE SOURCE CONFIGURATION
-                        // Try custom tile source with explicit HTTPS
-                        val tileSource = XYTileSource(
-                            "OpenStreetMap",
-                            0, 19, 256, ".png",
-                            arrayOf("https://a.tile.openstreetmap.org/",
-                                "https://b.tile.openstreetmap.org/",
-                                "https://c.tile.openstreetmap.org/"),
-                            "© OpenStreetMap contributors"
-                        )
-
-                        // Use the tile source
-                        setTileSource(tileSource)
+                        // Use standard tile source
+                        setTileSource(TileSourceFactory.MAPNIK)
 
                         // Enable built-in zoom controls
                         setMultiTouchControls(true)
                         zoomController.setVisibility(Visibility.SHOW_AND_FADEOUT)
 
-                        // debug tile source
-                        Log.d(TAG, "Tile source: $tileSource")
-
                         // Initial zoom and center
                         controller.setZoom(INITIAL_ZOOM_LEVEL)
                         controller.setCenter(USA_CENTER_GEOPOINT)
-
-                        // Add logging for tile loading
-                        addOnFirstLayoutListener { _, _, _, _, _ ->
-                            Log.d(TAG, "MapView first layout complete, ready to load tiles")
-                        }
 
                         // Setup location overlay
                         val locProvider = GpsMyLocationProvider(ctx)
@@ -316,16 +294,31 @@ fun MapScreen(
                         overlays.add(newLocationOverlay)
                         locationOverlay = newLocationOverlay
 
-                        // Setup marker cluster manager
-                        markerClusterManager = MarkerClusterManager(ctx, this).apply {
+                        // FIXED: Create the cluster manager with better configuration
+                        val manager = MarkerClusterManager(ctx, this).apply {
                             setAnimation(true)
-                            setMaxClusteringZoomLevel(15.0)
+                            setMaxClusteringZoomLevel(15.0) // Adjust based on your preference
+                            setClusterDistance(100) // Adjust based on your preference
                         }
 
-                        // Set tile loading listener
-                        addOnTilesLoadedListener {
-                            Log.d(TAG, "Tiles loaded successfully")
-                        }
+                        // IMPORTANT: Add the cluster manager's overlay to the map
+                        // This ensures the cluster overlay is rendered
+                        overlays.add(manager.getClusterOverlay())
+                        markerClusterManager = manager
+
+                        // ADDED: Add zoom listener to handle cluster updates
+                        addMapListener(object : MapListener {
+                            override fun onScroll(event: ScrollEvent?): Boolean {
+                                return false
+                            }
+
+                            override fun onZoom(event: ZoomEvent?): Boolean {
+                                Log.d(TAG, "Zoom changed to: ${event?.zoomLevel}")
+                                // Invalidate clusters when zoom changes
+                                markerClusterManager?.invalidate()
+                                return false
+                            }
+                        })
 
                         mapView = this
                         Timber.tag(TAG).d("MapView created and initialized in factory.")
@@ -388,8 +381,6 @@ fun MapScreen(
     }
 }
 
-fun addOnTilesLoadedListener(function: () -> Int) {}
-
 private fun updateMapWithSightings(
     view: MapView,
     uiState: MapUiState,
@@ -403,9 +394,12 @@ private fun updateMapWithSightings(
         return
     }
 
-    Timber.tag(TAG).d("Updating map. Sightings count: ${uiState.sightings.size}")
+    Timber.tag(TAG).d("Updating map with ${uiState.sightings.size} sightings")
+
+    // Clear existing markers and clusters
     clusterManager.clearItems()
 
+    // Create new markers
     var validMarkersCount = 0
     uiState.sightings.forEach { sighting ->
         if (sighting.latitude.isFinite() && sighting.longitude.isFinite() &&
@@ -439,10 +433,13 @@ private fun updateMapWithSightings(
             Timber.tag(TAG).w("Skipping sighting with invalid coordinates: ID ${sighting.id} at ${sighting.latitude}, ${sighting.longitude}")
         }
     }
-    Timber.tag(TAG).d("Added $validMarkersCount valid markers to cluster manager.")
-    clusterManager.invalidate()
-    view.invalidate()
 
+    Timber.tag(TAG).d("Added $validMarkersCount valid markers to cluster manager")
+
+    // Force cluster update
+    clusterManager.invalidate()
+
+    // If we have valid sightings, zoom to fit them all
     if (validMarkersCount > 0 && uiState.sightings.isNotEmpty()) {
         val boundingBox = BoundingBox()
         var pointsIncluded = 0
@@ -476,12 +473,9 @@ private fun BoundingBox.include(point: GeoPoint) {
     val east = maxOf(this.lonEast, point.longitude)
     val west = minOf(this.lonWest, point.longitude)
 
-    // Create a new bounding box with updated values
-    val newBox = BoundingBox(north, east, south, west)
-
     // Set values for this bounding box
-    this.latNorth = newBox.latNorth
-    this.latSouth = newBox.latSouth
-    this.lonEast = newBox.lonEast
-    this.lonWest = newBox.lonWest
+    this.latNorth = north
+    this.latSouth = south
+    this.lonEast = east
+    this.lonWest = west
 }

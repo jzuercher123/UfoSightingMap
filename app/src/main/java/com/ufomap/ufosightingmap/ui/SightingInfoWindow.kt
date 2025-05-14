@@ -1,5 +1,6 @@
 package com.ufomap.ufosightingmap.ui
 
+import android.R.id.closeButton
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
@@ -18,11 +19,16 @@ class SightingInfoWindow(
     private val onSightingClick: ((Int) -> Unit)? = null
 ) : InfoWindow(R.layout.sighting_info_window, mapView) {
 
+    override fun onClose() {
+        // Clean up resources if needed
+    }
+
     override fun onOpen(item: Any?) {
         if (item !is Marker) return
 
         // Get the sighting data associated with this marker
         val sighting = item.relatedObject as? Sighting
+        
 
         // Find all views in the layout
         val titleTextView = mView.findViewById<TextView>(R.id.title)
@@ -54,11 +60,15 @@ class SightingInfoWindow(
             // Close this info window
             close()
         }
+
+        // Add this: Configure the close button
+        closeButton.setOnClickListener {
+            // Close this info window
+            close()
+        }
     }
 
-    override fun onClose() {
-        // Clean up resources if needed
-    }
+    annotation class ImageButton
 
     companion object {
         /**
@@ -82,3 +92,5 @@ class SightingInfoWindow(
         }
     }
 }
+
+private fun Int.setOnClickListener(function: () -> Unit) {}
