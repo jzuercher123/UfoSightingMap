@@ -38,10 +38,6 @@ interface PopulationDataDao {
     @Query("SELECT * FROM population_data WHERE countyName = :county AND stateAbbreviation = :state")
     fun getPopulationDataByCounty(county: String, state: String): Flow<List<PopulationData>>
 
-    // Aggregation operations
-    @Query("SELECT AVG(populationDensity) FROM population_data WHERE year = :year")
-    suspend fun getAveragePopulationDensityByYear(year: Int): Float
-
     // Spatial queries
     @Query("""
         SELECT *, (
@@ -74,6 +70,7 @@ interface PopulationDataDao {
     """)
     suspend fun getAveragePopulationDensityForSightings(year: Int): Float
 
+    // Add the method that's being called in PopulationDataRepositoryJava
     @Query("""
         SELECT 
             CASE 
@@ -97,11 +94,3 @@ interface PopulationDataDao {
     """)
     fun getSightingsByPopulationDensity(year: Int): Flow<List<PopulationDensityDistribution>>
 }
-
-/**
- * Data class for population density distribution statistics
- */
-data class PopulationDensityDistribution(
-    val density_category: String,
-    val sighting_count: Int
-)

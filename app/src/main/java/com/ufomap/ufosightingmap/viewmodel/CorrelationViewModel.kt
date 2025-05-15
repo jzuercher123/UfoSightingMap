@@ -66,6 +66,22 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    val populationData: StateFlow<List<PopulationData>> = populationDataDao.getAllPopulationData()
+        .catch { e ->
+            Log.e(TAG, "Error in populationData flow: ${e.message}", e)
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val populationDensityDistribution: StateFlow<List<PopulationDensityDistribution>> = populationDataDao.getSightingsByPopulationDensity(2023) // Example year
+        .catch { e ->
+            Log.e(TAG, "Error in populationDensityDistribution flow: ${e.message}", e)
+            emit(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _populationAverageDensity = MutableStateFlow(0f)
+    val populationAverageDensity: StateFlow<Float> = _populationAverageDensity
 
     // Military Base Correlation State
     val militaryBases: StateFlow<List<MilitaryBase>>
@@ -275,6 +291,7 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
     private fun loadCorrelationStatistics() {
         viewModelScope.launch {
             try {
+
                 _isLoading.value = true // Indicate loading for stats calculation
                 // Military base correlation percentage (using current radius)
                 _militaryBaseCorrelationPercentage.value =
@@ -292,7 +309,9 @@ class CorrelationViewModel(application: Application) : AndroidViewModel(applicat
                 // Load population stats if needed (Commented out)
                 // val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - 1 // Example: use previous year
                 // _avgPopulationDensity.value = populationDataRepository.getAveragePopulationDensityForSightings(currentYear)
-
+                // Example population density calculation
+                val populationRepo = PopulationDataRepository(populationDataDao, getApplication())
+                _populationAverageDensity.value = populationRepo.getAveragePopulationDensityForSightings()
 
                 Log.d(TAG, "Correlation statistics loaded/reloaded.")
 
