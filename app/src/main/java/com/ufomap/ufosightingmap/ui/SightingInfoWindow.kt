@@ -93,4 +93,4 @@ class SightingInfoWindow(
     }
 }
 
-private fun Int.setOnClickListener(function: () -> Unit) {}
+private fun Int.setOnClickListener(function: () -> kotlin.Unit) {}

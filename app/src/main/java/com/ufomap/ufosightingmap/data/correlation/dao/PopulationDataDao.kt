@@ -38,6 +38,10 @@ interface PopulationDataDao {
     @Query("SELECT * FROM population_data WHERE countyName = :county AND stateAbbreviation = :state")
     fun getPopulationDataByCounty(county: String, state: String): Flow<List<PopulationData>>
 
+    // Aggregation operations
+    @Query("SELECT AVG(populationDensity) FROM population_data WHERE year = :year")
+    suspend fun getAveragePopulationDensityByYear(year: Int): Float
+
     // Spatial queries
     @Query("""
         SELECT *, (
