@@ -10,6 +10,7 @@ import com.ufomap.ufosightingmap.data.correlation.dao.DistanceDistribution
 import com.ufomap.ufosightingmap.data.correlation.dao.MilitaryBaseDao
 import com.ufomap.ufosightingmap.data.correlation.dao.SightingWithBaseDistance
 import com.ufomap.ufosightingmap.data.correlation.models.MilitaryBase
+import com.ufomap.ufosightingmap.utils.SmartCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,11 @@ class MilitaryBaseRepository(
 ) {
     private val TAG = "MilitaryBaseRepository"
     private val overpassApi = OverpassApi()
+
+    private val militaryBaseCache = SmartCache(
+        maxAgeMillis = 7 * 24 * 60 * 60_000, // Weekly
+        fetchData = { /* fetch implementation */ }
+    )
 
     /**
      * Fetch military base data from OpenStreetMap

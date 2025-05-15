@@ -147,4 +147,24 @@ interface AstronomicalEventDao {
         FROM sightings s
     """)
     suspend fun getPercentageSightingsDuringEvents(): Float
+
+    @Transaction
+    suspend fun updateEvents(events: List<AstronomicalEvent>) {
+        // Only update records that have actually changed
+        val existingIds = events.map { it.id }
+        val existingEvents = getEventsByIds(existingIds)
+
+        val existingMap = existingEvents.associateBy { it.id }
+        val toUpdate = events.filter { event ->
+            val existing = existingMap[event.id]
+            existing == null || existing != event
+        }
+
+        if (toUpdate.isNotEmpty()) {
+            insertAll(toUpdate)
+        }
+    }
+
+    @Query("SELECT * FROM astronomical_events WHERE id IN (:ids)")
+    suspend fun getEventsByIds(ids: List<String>): List<AstronomicalEvent>
 }

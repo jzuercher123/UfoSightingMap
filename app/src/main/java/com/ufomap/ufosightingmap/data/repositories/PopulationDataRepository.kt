@@ -1,5 +1,6 @@
 package com.ufomap.ufosightingmap.data.repositories
 
+
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
@@ -7,6 +8,7 @@ import com.google.gson.reflect.TypeToken
 import com.ufomap.ufosightingmap.data.correlation.dao.PopulationDataDao
 import com.ufomap.ufosightingmap.data.correlation.dao.PopulationDensityDistribution
 import com.ufomap.ufosightingmap.data.correlation.models.PopulationData
+import com.ufomap.ufosightingmap.utils.SmartCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -27,6 +29,11 @@ class PopulationDataRepository(
     private val context: Context
 ) {
     private val TAG = "PopulationDataRepo"
+
+    private val populationCache = SmartCache(
+        maxAgeMillis = 24 * 60 * 60_000, // Daily
+        fetchData = { /* fetch implementation */ }
+    )
 
     // Expose all population data as a Flow
     val allPopulationData: Flow<List<PopulationData>> = populationDataDao.getAllPopulationData()

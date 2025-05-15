@@ -2,14 +2,21 @@ package com.ufomap.ufosightingmap
 
 import android.app.Application
 import android.util.Log
+import androidx.work.WorkManager
+import com.ufomap.ufosightingmap.data.AppDatabase
+import com.ufomap.ufosightingmap.data.SightingRepository
+import com.ufomap.ufosightingmap.data.repositories.AstronomicalEventRepository
+import com.ufomap.ufosightingmap.data.repositories.MilitaryBaseRepository
+import com.ufomap.ufosightingmap.data.repositories.PopulationDataRepository
+import com.ufomap.ufosightingmap.data.repositories.WeatherEventRepository
+import com.ufomap.ufosightingmap.data.sync.DataSyncManager
+import com.ufomap.ufosightingmap.data.sync.DataUpdateWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import timber.log.Timber
-import com.ufomap.ufosightingmap.data.AppDatabase
-import com.ufomap.ufosightingmap.data.SightingRepository
 import org.osmdroid.config.Configuration
+import timber.log.Timber
 import java.io.File
 
 /**
@@ -23,6 +30,9 @@ class UFOSightingMapApplication : Application() {
     // Tag for logging
     private val TAG = "UFOSightingMapApp"
 
+    // Add this property
+    private lateinit var dataSyncManager: DataSyncManager
+
     override fun onCreate() {
         super.onCreate()
 
@@ -34,6 +44,9 @@ class UFOSightingMapApplication : Application() {
 
         // Initialize database and preload data
         initializeDatabase()
+
+        // Initialize data synchronization
+        initializeDataSync()
     }
 
     /**
@@ -138,5 +151,36 @@ class UFOSightingMapApplication : Application() {
             Timber.e(e, "Error verifying assets")
             Log.e(TAG, "Failed to verify assets: ${e.message}", e)
         }
+    }
+
+    private fun initializeDataSync() {
+        Timber.d("Initializing data synchronization system")
+
+        // Initialize repositories if needed
+        val database = AppDatabase.getDatabase(applicationContext)
+        val weatherRepo = WeatherEventRepository(database.weatherEventDao(), applicationContext)
+        val astronomicalRepo = AstronomicalEventRepository(database.astronomicalEventDao(), applicationContext)
+        val populationRepo = PopulationDataRepository(database.populationDataDao(), applicationContext)
+        val militaryRepo = MilitaryBaseRepository(database.militaryBaseDao(), applicationContext)
+
+        // Schedule background updates
+        DataUpdateWorker.scheduleUpdates(applicationContext)
+
+        // Initialize sync manager
+        dataSyncManager = DataSyncManager(
+            context = applicationContext,
+            weatherRepo = weatherRepo,
+            astronomicalRepo = astronomicalRepo,
+            populationRepo = populationRepo,
+            militaryRepo = militaryRepo,
+            scope = applicationScope
+        )
+
+        // Perform initial sync if needed
+        applicationScope.launch {
+            dataSyncManager.syncDataIfNeeded()
+        }
+
+        Timber.d("Data synchronization system initialized")
     }
 }

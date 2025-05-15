@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
  * Tab for displaying weather correlation analysis.
  */
 @Composable
-fun WeatherCorrelationTab(viewModel: CorrelationViewModel) { // Pass the CorrelationViewModel
+fun WeatherCorrelationTab(viewModel: CorrelationViewModel) { // Pass the CorrelationViewModel.kt
 
     // Collect states from the ViewModel
     val weatherTypeDistributions by viewModel.weatherTypeDistribution.collectAsState()

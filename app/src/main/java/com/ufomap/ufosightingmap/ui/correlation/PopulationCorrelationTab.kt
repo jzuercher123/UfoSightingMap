@@ -1,5 +1,6 @@
 package com.ufomap.ufosightingmap.ui.correlation
 
+import com.ufomap.ufosightingmap.data.correlation.dao.PopulationDensityDistribution
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -56,7 +57,7 @@ fun PopulationCorrelationTab(viewModel: CorrelationViewModel) {
 
     // Placeholder data until actual implementation
     val populationDensityDistributions = remember {
-        listOf(
+        listOf<PopulationDensityDistribution>(
             PopulationDensityDistribution("Rural (< 10 pop/km²)", 245),
             PopulationDensityDistribution("Suburban (10-100 pop/km²)", 612),
             PopulationDensityDistribution("Urban (100-1000 pop/km²)", 892),

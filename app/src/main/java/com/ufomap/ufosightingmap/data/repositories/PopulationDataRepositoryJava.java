@@ -6,9 +6,14 @@ import android.util.Log;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.ufomap.ufosightingmap.data.correlation.dao.PopulationDataDao;
+import com.ufomap.ufosightingmap.data.correlation.dao.PopulationDensityDistribution;
 import com.ufomap.ufosightingmap.data.correlation.models.PopulationData;
 
+// buffered reader
+import java.io.BufferedReader;
+
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,14 +85,14 @@ public class PopulationDataRepositoryJava {
      * Helper method to read asset file content
      */
     private String readAssetFile(String fileName) throws IOException {
-        return context.getAssets().open(fileName).bufferedReader().use(reader -> {
-            StringBuilder content = new StringBuilder();
+        StringBuilder content = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(context.getAssets().open(fileName)))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 content.append(line);
             }
-            return content.toString();
-        });
+        }
+        return content.toString();
     }
 
     /**

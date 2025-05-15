@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import com.ufomap.ufosightingmap.data.correlation.dao.PopulationDensityDistribution
+
 
 /**
  * ViewModel for population-related functionality

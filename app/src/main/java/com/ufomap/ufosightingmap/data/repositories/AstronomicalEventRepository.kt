@@ -11,6 +11,7 @@ import com.ufomap.ufosightingmap.data.correlation.dao.EventTypeDistribution
 import com.ufomap.ufosightingmap.data.correlation.dao.MeteorShowerCorrelation
 import com.ufomap.ufosightingmap.data.correlation.dao.SightingWithAstronomicalEvents
 import com.ufomap.ufosightingmap.data.correlation.models.AstronomicalEvent
+import com.ufomap.ufosightingmap.utils.SmartCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,11 @@ class AstronomicalEventRepository(
     private val api: AstronomicalEventApi? = null // Accept nullable API
 ) {
     private val TAG = "AstroEventRepository"
+
+    private val astronomicalCache = SmartCache(
+        maxAgeMillis = 15 * 60_000, // 15 minutes
+        fetchData = { /* fetch implementation */ }
+    )
 
     // Expose all events as a Flow
     val allEvents: Flow<List<AstronomicalEvent>> = astronomicalEventDao.getAllEvents()
