@@ -13,7 +13,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "PopulationDataApi"
@@ -25,6 +24,13 @@ private const val TAG = "PopulationDataApi"
 interface CensusApiService {
     /**
      * Get state-level population data
+     *
+     * @param year Year for which to fetch population data
+     * @param variables Comma-separated list of variables to retrieve
+     * @param region Region to filter data for
+     * @param apiKey API key for accessing the Census API
+     *
+     * Returns a [Response] containing a list of lists of strings representing the population data.
      */
     @GET("{year}/pep/population")
     suspend fun getStatePopulation(
@@ -36,6 +42,14 @@ interface CensusApiService {
 
     /**
      * Get county-level population data for more granular analysis
+     *
+     * @param year Year for which to fetch population data
+     * @param variables Comma-separated list of variables to retrieve
+     * @param region Region to filter data for
+     * @param apiKey API key for accessing the Census API
+     * @param stateFilter Optional filter for specific state
+     *
+     * Returns a [Response] containing a list of lists of strings representing the population data.
      */
     @GET("{year}/pep/population")
     suspend fun getCountyPopulation(
@@ -48,6 +62,13 @@ interface CensusApiService {
 
     /**
      * Get educational attainment data - useful for correlation analysis
+     *
+     * @param year Year for which to fetch education data
+     * @param variables Comma-separated list of variables to retrieve
+     * @param region Region to filter data for
+     * @param apiKey API key for accessing the Census API
+     *
+     * Returns a [Response] containing a list of lists of strings representing the education data.
      */
     @GET("{year}/acs/acs5/subject")
     suspend fun getEducationData(

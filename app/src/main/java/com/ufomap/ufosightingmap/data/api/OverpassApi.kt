@@ -118,6 +118,11 @@ class OverpassApi {
     /**
      * Builds an improved Overpass QL query to fetch military installations
      * Includes all military-related tags: military=*, military_service=*, landuse=military
+     *
+     * @param boundingBox Optional bounding box to limit search [south,west,north,east]
+     * @param limit Maximum number of results to return
+     *
+     * Returns a string containing the Overpass QL query to fetch military installations.
      */
     private fun buildOverpassQuery(boundingBox: String?, limit: Int): String {
         val bbox = boundingBox ?: ""
@@ -150,6 +155,10 @@ class OverpassApi {
     /**
      * Parse the JSON response from Overpass API into MilitaryBase objects
      * Enhanced to handle military, military_service, and landuse=military tags
+     *
+     * @param response JSON response from Overpass API
+     *
+     * Returns a list of MilitaryBase objects parsed from the JSON response.
      */
     private fun parseOverpassResponse(response: String): List<MilitaryBase> {
         val militaryBases = mutableListOf<MilitaryBase>()
@@ -253,6 +262,11 @@ class OverpassApi {
 
     /**
      * Determine military branch from available tags with improved detection
+     *
+     * @param tags JSON object containing tags from Overpass API response
+     * @param militaryType Type of military installation
+     *
+     * Returns a string representing the military branch of the installation.
      */
     private fun determineBranch(tags: JSONObject, militaryType: String): String {
         // Check explicit military_service tag first

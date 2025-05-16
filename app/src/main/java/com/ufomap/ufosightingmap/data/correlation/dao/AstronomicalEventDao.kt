@@ -5,7 +5,6 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
-import com.ufomap.ufosightingmap.data.Sighting
 import com.ufomap.ufosightingmap.data.correlation.models.AstronomicalEvent
 import kotlinx.coroutines.flow.Flow
 
@@ -19,7 +18,7 @@ interface AstronomicalEventDao {
     // Basic CRUD operations
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(events: List<AstronomicalEvent>)
+    suspend fun insertAll(events: Unit)
 
     @Query("SELECT * FROM astronomical_events")
     fun getAllEvents(): Flow<List<AstronomicalEvent>>
