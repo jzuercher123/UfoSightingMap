@@ -18,7 +18,7 @@ interface AstronomicalEventDao {
     // Basic CRUD operations
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(events: Unit)
+    suspend fun insertAll(events: List<AstronomicalEvent>)
 
     @Query("SELECT * FROM astronomical_events")
     fun getAllEvents(): Flow<List<AstronomicalEvent>>
